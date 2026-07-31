@@ -337,7 +337,8 @@ tbody tr:last-child td{border-bottom:0}
       <button class="btn btn-utama btn-penuh" onclick="cubaLogin()">Log masuk</button>
       <div class="nota-login">
         Kata laluan lalai ustazah: <b>aina2026</b><br>
-        Pelajar: guna kata laluan yang ustazah berikan.
+        Pelajar: guna kata laluan yang ustazah berikan.<br>
+        Adik-beradik yang berkongsi kata laluan akan masuk bersama.
       </div>
     </div>
   </div>
@@ -515,6 +516,7 @@ tbody tr:last-child td{border-bottom:0}
               <input class="medan" id="bulanYuran" type="month" onchange="lukisYuran()">
             </div>
             <button class="btn btn-utama" onclick="borangBayaran()">+ Rekod bayaran</button>
+            <button class="btn btn-emas" onclick="borangResitGabungan()">⎙ Resit gabungan</button>
           </div>
         </div>
         <div class="grid g4" id="statYuran" style="margin-bottom:18px"></div>
@@ -718,13 +720,15 @@ function benihData(){
   const kl=n=>n.toLowerCase().replace(/[^a-z]/g,"").slice(0,5)+"123";
   DB.pelajar=[
     {id:idBaru(),nama:"Nur Aisyah",penjaga:"Puan Zaleha",tel:"60123456789",kategori:"Al-Quran",
-     mukaSurat:47,tempoh:20,hari:[1,3],masa:"17:00",yuran:60,kl:"aisyah123",aktif:true,mula:bulanIni()},
+     mukaSurat:47,tempoh:20,hari:[1,3],masa:"17:00",yuran:60,kl:"zaleha123",keluarga:"ZALEHA",aktif:true,mula:bulanIni()},
+    {id:idBaru(),nama:"Nur Adriana",penjaga:"Puan Zaleha",tel:"60123456789",kategori:"Iqra' 3",
+     mukaSurat:14,tempoh:15,hari:[1,3],masa:"17:20",yuran:50,kl:"zaleha123",keluarga:"ZALEHA",aktif:true,mula:bulanIni()},
     {id:idBaru(),nama:"Muhammad Haziq",penjaga:"Encik Rahim",tel:"60129876543",kategori:"Iqra' 4",
-     mukaSurat:18,tempoh:15,hari:[2,4],masa:"17:30",yuran:50,kl:"haziq123",aktif:true,mula:bulanIni()},
+     mukaSurat:18,tempoh:15,hari:[2,4],masa:"17:30",yuran:50,kl:"haziq123",keluarga:"",aktif:true,mula:bulanIni()},
     {id:idBaru(),nama:"Siti Khadijah",penjaga:"Puan Mariam",tel:"60111222333",kategori:"Iqra' 2",
-     mukaSurat:9,tempoh:10,hari:[1,3,5],masa:"18:00",yuran:45,kl:"sitik123",aktif:true,mula:bulanIni()},
+     mukaSurat:9,tempoh:10,hari:[1,3,5],masa:"18:00",yuran:45,kl:"sitik123",keluarga:"",aktif:true,mula:bulanIni()},
     {id:idBaru(),nama:"Ahmad Danish",penjaga:"Encik Faizal",tel:"60134445555",kategori:"Iqra' 6",
-     mukaSurat:25,tempoh:30,hari:[6],masa:"09:00",yuran:60,kl:"danis123",aktif:true,mula:bulanIni()}
+     mukaSurat:25,tempoh:30,hari:[6],masa:"09:00",yuran:60,kl:"danis123",keluarga:"",aktif:true,mula:bulanIni()}
   ];
 }
 
@@ -750,7 +754,15 @@ function cubaLogin(){
   }else{
     const p=pel(el("pilihPelajar").value);
     if(!p){a.textContent="Sila pilih nama pelajar.";a.style.display="block";return}
-    if(p.kl===kl){SESI={peranan:"pelajar",pelajarId:p.id,nama:p.nama};mulaApp()}
+    if(p.kl===kl){
+      const kel=(p.keluarga||"").trim().toUpperCase();
+      let kump=[p];
+      if(kel)kump=DB.pelajar.filter(x=>x.aktif!==false&&(x.keluarga||"").trim().toUpperCase()===kel&&x.kl===kl);
+      if(!kump.some(x=>x.id===p.id))kump.push(p);
+      SESI={peranan:"pelajar",pelajarId:p.id,pelajarIds:kump.map(x=>x.id),
+            nama:kump.map(x=>x.nama).join(" & ")};
+      mulaApp();
+    }
     else{a.textContent="Kata laluan pelajar tidak sepadan.";a.style.display="block"}
   }
 }
@@ -771,7 +783,8 @@ function terapkanPeranan(){
   const sekat=["pelajar","tetapan"];
   document.querySelectorAll(".nav-btn").forEach(b=>{
     b.style.display=(!admin&&sekat.includes(b.dataset.hal))?"none":"flex"});
-  ['[onclick*="borangPelajar"]','[onclick*="borangBayaran"]','[onclick*="tandaSemua"]','#borangKomen']
+  ['[onclick*="borangPelajar"]','[onclick*="borangBayaran"]','[onclick*="borangResitGabungan"]',
+   '[onclick*="tandaSemua"]','#borangKomen']
     .forEach(s=>document.querySelectorAll(s).forEach(e=>e.style.display=admin?"":"none"));
   document.querySelectorAll(".hint").forEach(h=>h.style.display=admin?"":"none");
 }
@@ -837,8 +850,17 @@ function lukisPetunjuk(){
   el("petunjukKategori").innerHTML=KATEGORI.map(k=>pil(k.nama,k.warna)).join("");
 }
 function senaraiSaya(){
-  return adminKah()?DB.pelajar.filter(p=>p.aktif!==false)
-    :DB.pelajar.filter(p=>p.id===SESI.pelajarId);
+  if(adminKah())return DB.pelajar.filter(p=>p.aktif!==false);
+  const ids=SESI.pelajarIds&&SESI.pelajarIds.length?SESI.pelajarIds:[SESI.pelajarId];
+  return DB.pelajar.filter(p=>ids.includes(p.id));
+}
+function keluargaPelajar(p){return (p.keluarga||"").trim().toUpperCase()}
+function senaraiKeluarga(){
+  const s=new Set(DB.pelajar.filter(p=>p.aktif!==false).map(keluargaPelajar).filter(Boolean));
+  return [...s].sort();
+}
+function ahliKeluarga(kod){
+  return DB.pelajar.filter(p=>p.aktif!==false&&keluargaPelajar(p)===String(kod).toUpperCase());
 }
 
 /* =========================================================
@@ -922,7 +944,8 @@ function lukisPelajar(){
       <td>${pil(p.kategori,k.warna)}</td>
       <td>${(p.hari||[]).map(h=>HARI[h].slice(0,3)).join(", ")||"—"}<div style="font-size:11.5px;color:var(--teks-3)" class="num">${esc(p.masa||"")}</div></td>
       <td class="num">${p.tempoh} min</td>
-      <td>${esc(p.penjaga||"—")}<div style="font-size:11.5px;color:var(--teks-3)" class="num">${esc(p.tel||"")}</div></td>
+      <td>${esc(p.penjaga||"—")}<div style="font-size:11.5px;color:var(--teks-3)" class="num">${esc(p.tel||"")}</div>
+        ${p.keluarga?`<span class="pil" style="background:var(--emas)22;color:var(--emas);margin-top:3px">◈ ${esc(p.keluarga)}</span>`:""}</td>
       <td class="num">${rm(p.yuran)}</td>
       <td class="num" style="color:${tg>0?"var(--tunggak)":"var(--lunas)"};font-weight:700">${tg>0?rm(tg):"Lunas"}</td>
     </tr>`}).join("")+`</tbody></table></div>`
@@ -957,7 +980,15 @@ function borangPelajar(id){
       <div><label class="lbl">Yuran bulanan (RM)</label><input class="medan num" id="fYuran" type="number" min="0" step="5" value="${p.yuran||0}"></div>
       <div><label class="lbl">Mula berdaftar</label><input class="medan" id="fMula" type="month" value="${esc(p.mula||bulanIni())}"></div>
     </div>
-    <label class="lbl">Kata laluan pelajar</label><input class="medan" id="fKl" value="${esc(p.kl||"")}" placeholder="Contoh: aisyah123">
+    <div class="grid g2">
+      <div><label class="lbl">Kod keluarga (adik-beradik)</label>
+        <input class="medan" id="fKeluarga" value="${esc(p.keluarga||"")}" list="senaraiKel" placeholder="Contoh: ZALEHA — kosongkan jika tiada">
+        <datalist id="senaraiKel">${senaraiKeluarga().map(k=>`<option value="${esc(k)}">`).join("")}</datalist></div>
+      <div><label class="lbl">Kata laluan pelajar</label>
+        <input class="medan" id="fKl" value="${esc(p.kl||"")}" placeholder="Contoh: aisyah123"></div>
+    </div>
+    <div class="hint" style="display:flex;margin:-6px 0 12px">
+      Adik-beradik dengan <b>kod keluarga sama</b> dan <b>kata laluan sama</b> akan log masuk serentak.</div>
     <label class="lbl" style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:14px">
       <input type="checkbox" id="fAktif" ${p.aktif!==false?"checked":""}> Pelajar masih aktif</label>
   `,[
@@ -973,6 +1004,7 @@ function simpanPelajar(id){
     kategori:el("fKategori").value,mukaSurat:+el("fMs").value||0,tempoh:+el("fTempoh").value,
     masa:el("fMasa").value,hari:[...document.querySelectorAll(".fHari:checked")].map(c=>+c.value),
     yuran:+el("fYuran").value||0,mula:el("fMula").value||bulanIni(),
+    keluarga:el("fKeluarga").value.trim().toUpperCase(),
     kl:el("fKl").value.trim()||nama.toLowerCase().replace(/[^a-z]/g,"").slice(0,5)+"123",
     aktif:el("fAktif").checked};
   if(id)Object.assign(pel(id),data); else DB.pelajar.push(Object.assign({id:idBaru()},data));
@@ -1375,6 +1407,152 @@ ${tg>0?"Baki tunggakan: "+rm(tg):"Tiada tunggakan. Alhamdulillah."}
 
 Disediakan oleh Ustazah Aina`;
   window.open("https://wa.me/"+p.tel+"?text="+encodeURIComponent(teks),"_blank");
+}
+
+/* ---------- RESIT GABUNGAN (adik-beradik / berbilang pelajar) ---------- */
+function borangResitGabungan(){
+  if(!adminKah())return;
+  const bl=el("bulanYuran").value||bulanIni();
+  const senarai=DB.pelajar.filter(p=>p.aktif!==false)
+    .sort((a,b)=>(keluargaPelajar(a)||"zzz").localeCompare(keluargaPelajar(b)||"zzz")||a.nama.localeCompare(b.nama));
+  modal("Resit gabungan",`
+    <div class="grid g2">
+      <div><label class="lbl">Untuk bulan</label><input class="medan" id="gBulan" type="month" value="${bl}"></div>
+      <div><label class="lbl">Pilih keluarga (pantas)</label>
+        <select class="medan" id="gKeluarga" onchange="tandaKeluarga()">
+          <option value="">— pilih manual di bawah —</option>
+          ${senaraiKeluarga().map(k=>`<option value="${esc(k)}">${esc(k)} (${ahliKeluarga(k).length} orang)</option>`).join("")}
+        </select></div>
+    </div>
+    <label class="lbl">Pelajar dalam resit ini</label>
+    <div style="max-height:210px;overflow-y:auto;border:1.5px solid var(--garis);border-radius:10px;padding:8px;margin-bottom:14px">
+      ${senarai.map(p=>`<label style="display:flex;gap:9px;align-items:center;padding:6px 4px;cursor:pointer;border-bottom:1px solid var(--garis)">
+        <input type="checkbox" class="gPel" value="${p.id}" data-kel="${esc(keluargaPelajar(p))}" onchange="kiraGabung()">
+        <span style="flex:1"><b>${esc(p.nama)}</b>
+          <span style="font-size:11.5px;color:var(--teks-3)"> · ${esc(p.kategori)} · ${rm(p.yuran)}</span></span>
+        ${p.keluarga?`<span class="pil" style="background:var(--emas)22;color:var(--emas)">◈ ${esc(p.keluarga)}</span>`:""}
+      </label>`).join("")}
+    </div>
+    <label class="lbl">No. WhatsApp penerima</label>
+    <input class="medan" id="gTel" placeholder="60123456789">
+    <div class="kad" style="margin:0;background:var(--panel-2);box-shadow:none">
+      <div id="gRingkas" style="font-size:13.5px;color:var(--teks-2)">Belum ada pelajar dipilih.</div>
+    </div>
+  `,[
+    {teks:"Batal",kelas:"btn-hantu",fungsi:tutupModal},
+    {teks:"WhatsApp",kelas:"btn-hantu",fungsi:()=>resitGabungWhatsApp()},
+    {teks:"⎙ Cetak resit",kelas:"btn-emas",fungsi:()=>resitGabungCetak()}
+  ]);
+}
+function tandaKeluarga(){
+  const k=el("gKeluarga").value;
+  document.querySelectorAll(".gPel").forEach(c=>{c.checked=!!k&&c.dataset.kel===k});
+  const a=k?ahliKeluarga(k).find(x=>x.tel):null;
+  if(a)el("gTel").value=a.tel;
+  kiraGabung();
+}
+function pilihanGabung(){
+  const bl=el("gBulan").value||bulanIni();
+  const ids=[...document.querySelectorAll(".gPel:checked")].map(c=>c.value);
+  const baris=ids.map(id=>{const p=pel(id);
+    const rekod=DB.bayaran.filter(b=>b.pelajarId===id&&b.untukBulan===bl)
+      .sort((a,b)=>a.tarikh.localeCompare(b.tarikh));
+    return {p,rekod,dibayar:rekod.reduce((a,b)=>a+Number(b.jumlah||0),0),
+            tunggak:Math.max(0,tunggakanPelajar(p))}});
+  return {bl,baris,
+    jumlah:baris.reduce((a,x)=>a+x.dibayar,0),
+    tunggak:baris.reduce((a,x)=>a+x.tunggak,0),
+    no:"RSG-"+bl.replace("-","")+"-"+String(Date.now()).slice(-4)};
+}
+function kiraGabung(){
+  const g=pilihanGabung();
+  el("gRingkas").innerHTML=g.baris.length
+    ?`<b>${g.baris.length} pelajar</b> · Jumlah diterima <b class="num" style="color:var(--aksen)">${rm(g.jumlah)}</b>
+      ${g.tunggak>0?` · Baki tunggakan <b class="num" style="color:var(--tunggak)">${rm(g.tunggak)}</b>`:" · Tiada tunggakan"}`
+    :"Belum ada pelajar dipilih.";
+  if(!el("gTel").value){const a=g.baris.find(x=>x.p.tel);if(a)el("gTel").value=a.p.tel}
+}
+function resitGabungCetak(){
+  const g=pilihanGabung();
+  if(!g.baris.length){toast("Sila pilih sekurang-kurangnya seorang pelajar");return}
+  const penjaga=g.baris[0].p.penjaga||"";
+  const w=window.open("","_blank","width=470,height=700");
+  if(!w){toast("Sila benarkan pop-up untuk menjana resit");return}
+  w.document.write(`<!DOCTYPE html><html lang="ms"><head><meta charset="utf-8">
+  <title>Resit ${g.no}</title><style>
+    @page{size:A5;margin:12mm}
+    body{font-family:"Segoe UI",system-ui,sans-serif;color:#241047;padding:18px;margin:0}
+    .bingkai{border:2px solid #4C1D95;border-radius:12px;padding:22px}
+    h1{font-family:Palatino,Georgia,serif;font-size:19px;text-align:center;color:#2E1065;margin:0}
+    .sub{text-align:center;font-size:12px;color:#6B5B95;margin:4px 0 2px}
+    .no{text-align:center;font-family:monospace;font-size:12px;color:#8B7CB5;margin-bottom:14px}
+    .gd{border-top:1.5px dashed #B9A6E8;margin:12px 0}
+    .info{font-size:13px}.info div{display:flex;justify-content:space-between;padding:3px 0}
+    .info b{font-family:monospace}
+    table{width:100%;font-size:12.5px;border-collapse:collapse;margin-top:10px}
+    th{background:#F2EDFF;text-align:left;padding:7px 8px;font-size:11px;
+       text-transform:uppercase;letter-spacing:.05em;color:#4C1D95;border-bottom:1.5px solid #B9A6E8}
+    td{padding:7px 8px;border-bottom:1px solid #EDE7FB;vertical-align:top}
+    td.k{text-align:right;font-family:monospace;font-weight:700;white-space:nowrap}
+    .jum{background:#F2EDFF;border-radius:8px;padding:11px 13px;margin-top:12px;
+      display:flex;justify-content:space-between;align-items:center}
+    .jum b{font-size:19px;font-family:monospace;color:#4C1D95}
+    .tg{margin-top:9px;font-size:12.5px;text-align:center;padding:7px;border-radius:7px}
+    .kaki{margin-top:18px;text-align:center;font-size:11.5px;color:#6B5B95;line-height:1.7}
+    .cop{margin-top:16px;text-align:right;font-family:Palatino,Georgia,serif;font-size:13px;color:#2E1065}
+    @media print{.btn{display:none}}
+    .btn{display:block;width:100%;margin-top:16px;padding:11px;background:#6D28D9;color:#fff;
+      border:0;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer}
+  </style></head><body>
+  <div class="bingkai">
+    <h1>Kelas Mengaji Ustazah Aina</h1>
+    <div class="sub">Resit Gabungan Pembayaran Yuran</div>
+    <div class="no">No. ${g.no}</div>
+    <div class="gd"></div>
+    <div class="info">
+      <div><span>Penjaga</span><b>${esc(penjaga||"—")}</b></div>
+      <div><span>Bilangan pelajar</span><b>${g.baris.length} orang</b></div>
+      <div><span>Yuran untuk</span><b>${bulanCantik(g.bl)}</b></div>
+    </div>
+    <table><thead><tr><th>Pelajar</th><th>Butiran</th><th style="text-align:right">Jumlah</th></tr></thead><tbody>
+    ${g.baris.map(x=>`<tr>
+      <td><b>${esc(x.p.nama)}</b><br><span style="color:#6B5B95">${esc(x.p.kategori)}</span></td>
+      <td style="color:#6B5B95">${x.rekod.length?x.rekod.map(r=>`${r.tarikh} · ${esc(r.kaedah)}${r.rujukan?" · "+esc(r.rujukan):""}`).join("<br>"):"Tiada bayaran direkod"}
+        ${x.tunggak>0?`<br><span style="color:#B91C1C">tunggakan ${rm(x.tunggak)}</span>`:""}</td>
+      <td class="k">${rm(x.dibayar)}</td></tr>`).join("")}
+    </tbody></table>
+    <div class="jum"><span>Jumlah keseluruhan diterima</span><b>${rm(g.jumlah)}</b></div>
+    <div class="tg" style="background:${g.tunggak>0?"#FEE2E2":"#DCFCE7"};color:${g.tunggak>0?"#B91C1C":"#15803D"}">
+      ${g.tunggak>0?"Baki tunggakan keseluruhan: <b>"+rm(g.tunggak)+"</b>":"Tiada tunggakan — terima kasih"}</div>
+    <div class="cop">Disediakan oleh<br><b>Ustazah Aina</b></div>
+    <div class="kaki">Resit dijana automatik pada ${new Date().toLocaleString("ms-MY")}<br>
+      Simpan resit ini sebagai bukti pembayaran.</div>
+  </div>
+  <button class="btn" onclick="window.print()">⎙ Cetak / Simpan sebagai PDF</button>
+  </body></html>`);
+  w.document.close();
+}
+function resitGabungWhatsApp(){
+  const g=pilihanGabung();
+  if(!g.baris.length){toast("Sila pilih sekurang-kurangnya seorang pelajar");return}
+  const tel=(el("gTel").value||"").replace(/\D/g,"");
+  if(!tel){toast("Sila isi nombor WhatsApp penerima");return}
+  const teks=
+`*RESIT GABUNGAN — KELAS MENGAJI USTAZAH AINA*
+No. resit: ${g.no}
+
+Assalamualaikum ${g.baris[0].p.penjaga||""},
+Terima kasih atas pembayaran yuran mengaji bagi *${bulanCantik(g.bl)}*.
+
+${g.baris.map(x=>`• ${x.p.nama} (${x.p.kategori})
+   ${x.rekod.length?x.rekod.map(r=>`${r.tarikh} · ${r.kaedah}${r.rujukan?" · "+r.rujukan:""}`).join("\n   "):"Tiada bayaran direkod"}
+   Jumlah: ${rm(x.dibayar)}${x.tunggak>0?`\n   Tunggakan: ${rm(x.tunggak)}`:""}`).join("\n")}
+
+*JUMLAH KESELURUHAN: ${rm(g.jumlah)}*
+${g.tunggak>0?"Baki tunggakan keseluruhan: "+rm(g.tunggak):"Tiada tunggakan. Alhamdulillah."}
+
+Disediakan oleh Ustazah Aina`;
+  window.open("https://wa.me/"+tel+"?text="+encodeURIComponent(teks),"_blank");
 }
 
 /* =========================================================
