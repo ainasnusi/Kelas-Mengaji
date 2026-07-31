@@ -17,7 +17,7 @@
 var KATA_KUNCI = 'rahsia-kelas-aina';   // <<< TUKAR INI
 
 var SKEMA = {
-  Pelajar:   ['id','nama','penjaga','tel','kategori','mukaSurat','tempoh','hari','masa','yuran','mula','kl','aktif'],
+  Pelajar:   ['id','nama','penjaga','tel','kategori','mukaSurat','tempoh','hari','masa','yuran','mula','kl','keluarga','aktif'],
   Kehadiran: ['id','pelajarId','tarikh','status','tempoh','msDari','msHingga','catatan'],
   Bayaran:   ['id','pelajarId','tarikh','untukBulan','jumlah','kaedah','rujukan','catatan'],
   Komen:     ['id','pelajarId','tarikh','jenis','teks']
@@ -148,3 +148,4 @@ function doPost(e) {
     try { kunci.releaseLock(); } catch (x) {}
   }
 }
+
