@@ -1299,6 +1299,7 @@ function lukisBacaan(){
         <span class="num" style="min-width:64px">m.s ${s.msDari}–${s.msHingga}</span>
         <span style="color:var(--teks-2);flex:1">${esc(s.catatan||"")}</span></div>`).join("")
         :'<div style="font-size:12.5px;color:var(--teks-3)">Belum ada rekod bacaan.</div>'}
+      ${adminKah()?`<button class="btn btn-kecil btn-utama" style="width:100%;margin-top:12px" onclick="borangBacaan('${p.id}')">✎ Kemas kini bacaan</button>`:""}
     </div>`}).join(""):kosong("Tiada pelajar","");
 }
 
