@@ -336,7 +336,6 @@ tbody tr:last-child td{border-bottom:0}
              onkeydown="if(event.key==='Enter')cubaLogin()">
       <button class="btn btn-utama btn-penuh" onclick="cubaLogin()">Log masuk</button>
       <div class="nota-login">
-        Kata laluan lalai ustazah: <b>aina2026</b><br>
         Pelajar: guna kata laluan yang ustazah berikan.<br>
         Adik-beradik yang berkongsi kata laluan akan masuk bersama.
       </div>
@@ -694,6 +693,14 @@ function formatTarikh(s){
   if(!isNaN(d))return iso(d);
   return str;
 }
+function masaRingkas(d){
+  d=d||new Date();
+  return d.toLocaleTimeString("ms-MY",{hour:"2-digit",minute:"2-digit",hour12:false});
+}
+function tarikhMasaRingkas(d){
+  d=d||new Date();
+  return d.toLocaleDateString("ms-MY",{day:"numeric",month:"short",year:"numeric"})+", "+masaRingkas(d);
+}
 const iso=d=>{const x=new Date(d);x.setMinutes(x.getMinutes()-x.getTimezoneOffset());return x.toISOString().slice(0,10)};
 const hariIni=()=>iso(new Date());
 const bulanIni=()=>hariIni().slice(0,7);
@@ -715,6 +722,12 @@ const adminKah=()=>SESI&&SESI.peranan==="admin";
    ========================================================= */
 let sudahTarik=false;   // pengadang: jangan hantar sebelum data Sheet ditarik
 let belumDihantar=false; // ada perubahan tempatan yang belum sampai ke Sheet
+try{
+  sudahTarik=localStorage.getItem(KUNCI+"_sudahTarik")==="1";
+  belumDihantar=localStorage.getItem(KUNCI+"_belum")==="1";
+}catch(e){}
+function tandaSudahTarik(v){sudahTarik=v;try{if(v)localStorage.setItem(KUNCI+"_sudahTarik","1");else localStorage.removeItem(KUNCI+"_sudahTarik")}catch(e){}}
+function tandaBelumDihantar(v){belumDihantar=v;try{if(v)localStorage.setItem(KUNCI+"_belum","1");else localStorage.removeItem(KUNCI+"_belum")}catch(e){}}
 
 function simpan(){
   try{localStorage.setItem(KUNCI,JSON.stringify(DB))}catch(e){}
@@ -733,7 +746,7 @@ let _tolak;
 function jadualTolak(){
   if(!DB.tetapan.urlApi)return;
   if(!sudahTarik){lencanaSegerak("Belum segerak","#EA580C");return}
-  belumDihantar=true;
+  tandaBelumDihantar(true);
   clearTimeout(_tolak);_tolak=setTimeout(()=>tolakKeSheet(false),2500);
 }
 async function tolakKeSheet(lapor){
@@ -745,16 +758,18 @@ async function tolakKeSheet(lapor){
       body:JSON.stringify({tindakan:"tulis",kunci:DB.tetapan.tokenApi,data:{
         pelajar:DB.pelajar,kehadiran:DB.kehadiran,bayaran:DB.bayaran,komen:DB.komen,tetapan:DB.tetapan}})});
     const j=await r.json();
-    if(j.ok){sudahTarik=true;belumDihantar=false;
-      const m=new Date().toLocaleTimeString("ms-MY");
+    if(j.ok){tandaSudahTarik(true);tandaBelumDihantar(false);
+      const m=masaRingkas();
       el("statusApi").textContent="Disegerakkan ke Google Sheet pada "+m;
-      lencanaSegerak("Tersegerak "+m.slice(0,5),"#16A34A");
-      if(lapor)toast("Data dihantar ke Google Sheet")}
+      lencanaSegerak("Tersegerak "+m,"#16A34A");
+      if(lapor)toast("Data dihantar ke Google Sheet");
+      return true}
     else throw new Error(j.ralat||"gagal");
   }catch(e){
     el("statusApi").textContent="Gagal menghantar: "+e.message;
     lencanaSegerak("Gagal hantar","#DC2626");
-    if(lapor)toast("Gagal menghantar — semak URL & kata kunci")}
+    if(lapor)toast("Gagal menghantar — semak URL & kata kunci");
+    return false}
 }
 async function tarikDariSheet(senyap){
   if(!DB.tetapan.urlApi){if(!senyap)toast("Sila isi URL Web App dahulu");return false}
@@ -770,11 +785,11 @@ async function tarikDariSheet(senyap){
     (DB.bayaran||[]).forEach(b=>{if(b.tarikh)b.tarikh=formatTarikh(b.tarikh)});
     if(j.data.tetapan)DB.tetapan=Object.assign(DB.tetapan,j.data.tetapan,
       CONFIG.URL_SHEET?{urlApi:CONFIG.URL_SHEET,tokenApi:CONFIG.KATA_KUNCI}:{});
-    sudahTarik=true;
+    tandaSudahTarik(true);
     try{localStorage.setItem(KUNCI,JSON.stringify(DB))}catch(e){}
-    const m=new Date().toLocaleTimeString("ms-MY");
+    const m=masaRingkas();
     el("statusApi").textContent="Dimuat turun pada "+m;
-    lencanaSegerak("Tersegerak "+m.slice(0,5),"#16A34A");
+    lencanaSegerak("Tersegerak "+m,"#16A34A");
     if(SESI)lukisSemua(); else if(peranPilih==="pelajar")pilihPeranan("pelajar");
     if(!senyap)toast("Data dimuat turun dari Google Sheet");
     return true;
@@ -883,7 +898,7 @@ function bukaHalaman(h){
   el("hal-"+h).classList.add("aktif");
   document.querySelectorAll(".nav-btn").forEach(b=>b.classList.toggle("aktif",b.dataset.hal===h));
   el("tajukHalaman").innerHTML=esc(TAJUK[h][0])+`<small>${esc(TAJUK[h][1])}</small>`;
-  el("cetakSari").textContent=TAJUK[h][0]+" — dicetak "+new Date().toLocaleString("ms-MY");
+  el("cetakSari").textContent=TAJUK[h][0]+" — dicetak "+tarikhMasaRingkas();
   el("sidebar").classList.remove("buka");
   window.scrollTo({top:0,behavior:"smooth"});
   lukisSemua();
@@ -1454,7 +1469,7 @@ function resitCetak(id){
     <div class="tg" style="background:${tg>0?"#FEE2E2":"#DCFCE7"};color:${tg>0?"#B91C1C":"#15803D"}">
       ${tg>0?"Baki tunggakan terkumpul: <b>"+rm(tg)+"</b>":"Tiada tunggakan — terima kasih"}</div>
     <div class="cop">Disediakan oleh<br><b>Ustazah Aina</b></div>
-    <div class="kaki">Resit dijana automatik pada ${new Date().toLocaleString("ms-MY")}<br>
+    <div class="kaki">Resit dijana automatik pada ${tarikhMasaRingkas()}<br>
       Simpan resit ini sebagai bukti pembayaran.</div>
   </div>
   <button class="btn" onclick="window.print()">⎙ Cetak / Simpan sebagai PDF</button>
@@ -1600,7 +1615,7 @@ function resitGabungCetak(){
     <div class="tg" style="background:${g.tunggak>0?"#FEE2E2":"#DCFCE7"};color:${g.tunggak>0?"#B91C1C":"#15803D"}">
       ${g.tunggak>0?"Baki tunggakan keseluruhan: <b>"+rm(g.tunggak)+"</b>":"Tiada tunggakan — terima kasih"}</div>
     <div class="cop">Disediakan oleh<br><b>Ustazah Aina</b></div>
-    <div class="kaki">Resit dijana automatik pada ${new Date().toLocaleString("ms-MY")}<br>
+    <div class="kaki">Resit dijana automatik pada ${tarikhMasaRingkas()}<br>
       Simpan resit ini sebagai bukti pembayaran.</div>
   </div>
   <button class="btn" onclick="window.print()">⎙ Cetak / Simpan sebagai PDF</button>
@@ -1718,7 +1733,10 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")tutupModal()});
   pilihPeranan("admin");
   const s=sessionStorage.getItem("sesi_aina");
   if(s){try{SESI=JSON.parse(s);if(SESI.peranan!=="pelajar"||pel(SESI.pelajarId))mulaApp();else SESI=null}catch(e){}}
-  if(DB.tetapan.urlApi)tarikDariSheet(true);
+  if(DB.tetapan.urlApi){
+    if(belumDihantar){clearTimeout(_tolak);tolakKeSheet(false).then(berjaya=>{if(berjaya)tarikDariSheet(true)})}
+    else tarikDariSheet(true);
+  }
   // segerak semula bila tab diaktifkan semula (contoh: tukar dari telefon ke laptop)
   document.addEventListener("visibilitychange",()=>{
     if(!document.hidden&&DB.tetapan.urlApi&&SESI){
