@@ -336,6 +336,7 @@ tbody tr:last-child td{border-bottom:0}
              onkeydown="if(event.key==='Enter')cubaLogin()">
       <button class="btn btn-utama btn-penuh" onclick="cubaLogin()">Log masuk</button>
       <div class="nota-login">
+        Kata laluan lalai ustazah: <b>aina2026</b><br>
         Pelajar: guna kata laluan yang ustazah berikan.<br>
         Adik-beradik yang berkongsi kata laluan akan masuk bersama.
       </div>
@@ -685,6 +686,14 @@ function formatMasa(m){
   if(c)return c[1].padStart(2,"0")+":"+c[2];
   return s;
 }
+function formatTarikh(s){
+  if(!s)return s;
+  const str=String(s);
+  if(/^\d{4}-\d{2}-\d{2}/.test(str))return str.slice(0,10);
+  const d=new Date(str);
+  if(!isNaN(d))return iso(d);
+  return str;
+}
 const iso=d=>{const x=new Date(d);x.setMinutes(x.getMinutes()-x.getTimezoneOffset());return x.toISOString().slice(0,10)};
 const hariIni=()=>iso(new Date());
 const bulanIni=()=>hariIni().slice(0,7);
@@ -705,6 +714,7 @@ const adminKah=()=>SESI&&SESI.peranan==="admin";
    3. SIMPAN & SEGERAK
    ========================================================= */
 let sudahTarik=false;   // pengadang: jangan hantar sebelum data Sheet ditarik
+let belumDihantar=false; // ada perubahan tempatan yang belum sampai ke Sheet
 
 function simpan(){
   try{localStorage.setItem(KUNCI,JSON.stringify(DB))}catch(e){}
@@ -723,6 +733,7 @@ let _tolak;
 function jadualTolak(){
   if(!DB.tetapan.urlApi)return;
   if(!sudahTarik){lencanaSegerak("Belum segerak","#EA580C");return}
+  belumDihantar=true;
   clearTimeout(_tolak);_tolak=setTimeout(()=>tolakKeSheet(false),2500);
 }
 async function tolakKeSheet(lapor){
@@ -734,7 +745,7 @@ async function tolakKeSheet(lapor){
       body:JSON.stringify({tindakan:"tulis",kunci:DB.tetapan.tokenApi,data:{
         pelajar:DB.pelajar,kehadiran:DB.kehadiran,bayaran:DB.bayaran,komen:DB.komen,tetapan:DB.tetapan}})});
     const j=await r.json();
-    if(j.ok){sudahTarik=true;
+    if(j.ok){sudahTarik=true;belumDihantar=false;
       const m=new Date().toLocaleTimeString("ms-MY");
       el("statusApi").textContent="Disegerakkan ke Google Sheet pada "+m;
       lencanaSegerak("Tersegerak "+m.slice(0,5),"#16A34A");
@@ -755,6 +766,8 @@ async function tarikDariSheet(senyap){
     if(!j.ok)throw new Error(j.ralat||"gagal");
     ["pelajar","kehadiran","bayaran","komen"].forEach(k=>{if(Array.isArray(j.data[k]))DB[k]=j.data[k]});
     (DB.pelajar||[]).forEach(p=>{if(p.masa)p.masa=formatMasa(p.masa)});
+    (DB.kehadiran||[]).forEach(k=>{if(k.tarikh)k.tarikh=formatTarikh(k.tarikh)});
+    (DB.bayaran||[]).forEach(b=>{if(b.tarikh)b.tarikh=formatTarikh(b.tarikh)});
     if(j.data.tetapan)DB.tetapan=Object.assign(DB.tetapan,j.data.tetapan,
       CONFIG.URL_SHEET?{urlApi:CONFIG.URL_SHEET,tokenApi:CONFIG.KATA_KUNCI}:{});
     sudahTarik=true;
@@ -1708,7 +1721,22 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")tutupModal()});
   if(DB.tetapan.urlApi)tarikDariSheet(true);
   // segerak semula bila tab diaktifkan semula (contoh: tukar dari telefon ke laptop)
   document.addEventListener("visibilitychange",()=>{
-    if(!document.hidden&&DB.tetapan.urlApi&&SESI)tarikDariSheet(true)});
+    if(!document.hidden&&DB.tetapan.urlApi&&SESI){
+      if(belumDihantar){clearTimeout(_tolak);tolakKeSheet(false)}
+      else tarikDariSheet(true);
+    }
+  });
+  // cuba hantar perubahan tertunggak sebelum tab/app ditutup
+  window.addEventListener("pagehide",()=>{
+    if(belumDihantar&&DB.tetapan.urlApi&&navigator.sendBeacon){
+      try{
+        const blob=new Blob([JSON.stringify({tindakan:"tulis",kunci:DB.tetapan.tokenApi,data:{
+          pelajar:DB.pelajar,kehadiran:DB.kehadiran,bayaran:DB.bayaran,komen:DB.komen,tetapan:DB.tetapan}})],
+          {type:"text/plain;charset=utf-8"});
+        navigator.sendBeacon(DB.tetapan.urlApi,blob);
+      }catch(e){}
+    }
+  });
 })();
 </script>
 </body>
