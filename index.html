@@ -336,6 +336,7 @@ tbody tr:last-child td{border-bottom:0}
              onkeydown="if(event.key==='Enter')cubaLogin()">
       <button class="btn btn-utama btn-penuh" onclick="cubaLogin()">Log masuk</button>
       <div class="nota-login">
+        Kata laluan lalai ustazah: <b>aina2026</b><br>
         Pelajar: guna kata laluan yang ustazah berikan.<br>
         Adik-beradik yang berkongsi kata laluan akan masuk bersama.
       </div>
@@ -693,6 +694,14 @@ function formatTarikh(s){
   if(!isNaN(d))return iso(d);
   return str;
 }
+function formatBulan(s){
+  if(!s)return s;
+  const str=String(s);
+  if(/^\d{4}-\d{2}$/.test(str))return str;
+  const t=formatTarikh(str);
+  if(/^\d{4}-\d{2}/.test(t))return t.slice(0,7);
+  return str;
+}
 function masaRingkas(d){
   d=d||new Date();
   return d.toLocaleTimeString("ms-MY",{hour:"2-digit",minute:"2-digit",hour12:false});
@@ -706,10 +715,11 @@ const hariIni=()=>iso(new Date());
 const bulanIni=()=>hariIni().slice(0,7);
 function tarikhCantik(s){if(!s)return"—";const d=new Date(s+"T00:00:00");
   return `${HARI[d.getDay()]}, ${d.getDate()} ${BULAN[d.getMonth()]} ${d.getFullYear()}`}
-function bulanCantik(s){if(!s)return"—";const[a,b]=s.split("-");return `${BULAN[+b-1]} ${a}`}
+function bulanCantik(s){s=formatBulan(s);if(!s)return"—";const[a,b]=s.split("-");if(!a||!b)return"—";return `${BULAN[+b-1]} ${a}`}
 function isnin(d){const x=new Date(d);const g=(x.getDay()+6)%7;x.setDate(x.getDate()-g);return iso(x)}
 function tambahHari(s,n){const d=new Date(s+"T00:00:00");d.setDate(d.getDate()+n);return iso(d)}
 function kat(nama){return KATEGORI.find(k=>k.nama===nama)||KATEGORI[0]}
+function juzukDaripada(ms){return Math.min(30,Math.max(1,Math.ceil((+ms||1)/20.13)))}
 function pel(id){return DB.pelajar.find(p=>p.id===id)}
 function toast(m){const t=el("toast");t.textContent=m;t.classList.add("tunjuk");
   clearTimeout(t._j);t._j=setTimeout(()=>t.classList.remove("tunjuk"),2600)}
@@ -733,10 +743,19 @@ function simpan(){
   try{localStorage.setItem(KUNCI,JSON.stringify(DB))}catch(e){}
   jadualTolak();
 }
+function bersihkanDB(){
+  (DB.pelajar||[]).forEach(p=>{if(p.masa)p.masa=formatMasa(p.masa)});
+  (DB.kehadiran||[]).forEach(k=>{if(k.tarikh)k.tarikh=formatTarikh(k.tarikh)});
+  (DB.bayaran||[]).forEach(b=>{
+    if(b.tarikh)b.tarikh=formatTarikh(b.tarikh);
+    if(b.untukBulan)b.untukBulan=formatBulan(b.untukBulan);
+  });
+}
 function muat(){
   try{const j=localStorage.getItem(KUNCI);if(j)DB=Object.assign(DB,JSON.parse(j))}catch(e){}
   if(CONFIG.URL_SHEET){DB.tetapan.urlApi=CONFIG.URL_SHEET;DB.tetapan.tokenApi=CONFIG.KATA_KUNCI}
   if(!DB.pelajar.length)benihData();
+  bersihkanDB();
 }
 function lencanaSegerak(teks,warna){
   const e=el("lencanaSegerak");if(!e)return;
@@ -780,9 +799,7 @@ async function tarikDariSheet(senyap){
     const j=await r.json();
     if(!j.ok)throw new Error(j.ralat||"gagal");
     ["pelajar","kehadiran","bayaran","komen"].forEach(k=>{if(Array.isArray(j.data[k]))DB[k]=j.data[k]});
-    (DB.pelajar||[]).forEach(p=>{if(p.masa)p.masa=formatMasa(p.masa)});
-    (DB.kehadiran||[]).forEach(k=>{if(k.tarikh)k.tarikh=formatTarikh(k.tarikh)});
-    (DB.bayaran||[]).forEach(b=>{if(b.tarikh)b.tarikh=formatTarikh(b.tarikh)});
+    bersihkanDB();
     if(j.data.tetapan)DB.tetapan=Object.assign(DB.tetapan,j.data.tetapan,
       CONFIG.URL_SHEET?{urlApi:CONFIG.URL_SHEET,tokenApi:CONFIG.KATA_KUNCI}:{});
     tandaSudahTarik(true);
@@ -1006,11 +1023,12 @@ function lukisDashboard(){
 function jadualBacaan(senarai){
   if(!senarai.length)return kosong("Tiada pelajar","");
   return `<div class="bekas-jadual"><table><thead><tr>
-    <th>Pelajar</th><th>Kategori</th><th>Muka surat</th><th style="width:32%">Kemajuan</th></tr></thead><tbody>`+
+    <th>Pelajar</th><th>Kategori</th><th>Muka surat</th><th>Juzuk</th><th style="width:28%">Kemajuan</th></tr></thead><tbody>`+
   senarai.map(p=>{const k=kat(p.kategori),pk=Math.min(100,Math.round((p.mukaSurat||0)/k.maks*100));
     return `<tr ondblclick="borangBacaan('${p.id}')">
       <td><b>${esc(p.nama)}</b></td><td>${pil(p.kategori,k.warna)}</td>
       <td class="num">${p.mukaSurat||0} / ${k.maks}</td>
+      <td class="num">${p.kategori==="Al-Quran"?juzukDaripada(p.mukaSurat||1):"—"}</td>
       <td><div class="bar"><i style="width:${pk}%"></i></div>
         <span style="font-size:11.5px;color:var(--teks-3)">${pk}%</span></td></tr>`}).join("")+
   `</tbody></table></div>`;
@@ -1110,15 +1128,23 @@ function hapusPelajar(id){
 function borangBacaan(id){
   if(!adminKah())return;
   const p=pel(id);
+  const quran=p.kategori==="Al-Quran";
   modal("Kemas kini bacaan — "+p.nama,`
     <div class="grid g2">
-      <div><label class="lbl">Kategori</label><select class="medan" id="bKategori">
+      <div><label class="lbl">Kategori</label><select class="medan" id="bKategori" onchange="el('bJuzuk').style.display=this.value==='Al-Quran'?'flex':'none'">
         ${KATEGORI.map(k=>`<option ${k.nama===p.kategori?"selected":""}>${k.nama}</option>`).join("")}</select></div>
-      <div><label class="lbl">Muka surat terkini</label><input class="medan num" id="bMs" type="number" min="0" value="${p.mukaSurat||0}"></div>
-    </div>`,
+      <div><label class="lbl">Muka surat terkini</label><input class="medan num" id="bMs" type="number" min="0" value="${p.mukaSurat||0}" oninput="el('bJuzukTeks').textContent='Juzuk '+juzukDaripada(this.value)"></div>
+    </div>
+    <div id="bJuzuk" style="display:${quran?"flex":"none"};align-items:center;margin:-6px 0 14px">
+      <span class="pil" style="background:#8B5CF622;color:#8B5CF6"><i class="titik" style="background:#8B5CF6"></i><span id="bJuzukTeks">Juzuk ${juzukDaripada(p.mukaSurat||1)}</span></span>
+    </div>
+    <label class="lbl">Rujukan sambungan (untuk kelas akan datang)</label>
+    <textarea class="medan" id="bSambungan" placeholder="Contoh: Sambung Surah Al-Baqarah ayat 15, atau m.s. 47 baris ke-3">${esc(p.sambungan||"")}</textarea>
+  `,
     [{teks:"Batal",kelas:"btn-hantu",fungsi:tutupModal},
      {teks:"Simpan",kelas:"btn-utama",fungsi:()=>{
        p.kategori=el("bKategori").value;p.mukaSurat=+el("bMs").value||0;
+       p.sambungan=el("bSambungan").value.trim();
        simpan();tutupModal();lukisSemua();toast("Kemajuan bacaan dikemas kini")}}]);
 }
 
@@ -1259,8 +1285,12 @@ function lukisBacaan(){
         ${pil(p.kategori,k.warna)}</div>
       <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
         <span class="num" style="font-family:var(--serif);font-size:30px;font-weight:700;color:${k.warna}">${p.mukaSurat||0}</span>
-        <span style="font-size:13px;color:var(--teks-3)">/ ${k.maks} muka surat · ${pk}%</span></div>
+        <span style="font-size:13px;color:var(--teks-3)">/ ${k.maks} muka surat · ${pk}%</span>
+        ${p.kategori==="Al-Quran"?pil("Juzuk "+juzukDaripada(p.mukaSurat||1),"#8B5CF6"):""}</div>
       <div class="bar" style="margin-bottom:14px"><i style="width:${pk}%;background:linear-gradient(90deg,${k.warna},var(--emas))"></i></div>
+      ${p.sambungan?`<div style="background:var(--panel-2);border-radius:10px;padding:9px 12px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--teks-3);margin-bottom:3px">Sambungan kelas akan datang</div>
+        <div style="font-size:13px;color:var(--teks-2)">${esc(p.sambungan)}</div></div>`:""}
       <div style="display:flex;gap:16px;font-size:12.5px;color:var(--teks-2);margin-bottom:12px">
         <span><b class="num">${jumMinit}</b> minit terkumpul</span>
         <span><b class="num">${p.tempoh}</b> minit / sesi</span></div>
@@ -1369,7 +1399,7 @@ function lukisBayaran(){
     <th>Tarikh bayar</th><th>Pelajar</th><th>Untuk bulan</th><th>Kaedah</th><th>Jumlah</th><th>Rujukan</th></tr></thead><tbody>`+
   rekod.map(b=>{const p=pel(b.pelajarId);const w=b.kaedah==="Online"?"#0891B2":"#16A34A";
     return `<tr ondblclick="borangBayaran('${b.id}')">
-      <td class="num">${b.tarikh}</td><td><b>${esc(p?p.nama:"—")}</b></td>
+      <td class="num">${esc(formatTarikh(b.tarikh))}</td><td><b>${esc(p?p.nama:"—")}</b></td>
       <td>${bulanCantik(b.untukBulan)}</td><td>${pil(b.kaedah,w)}</td>
       <td class="num" style="font-weight:700">${rm(b.jumlah)}</td>
       <td style="font-size:12.5px;color:var(--teks-2)">${esc(b.rujukan||"—")}</td></tr>`}).join("")+
@@ -1461,7 +1491,7 @@ function resitCetak(id){
       <tr><td>Penjaga</td><td>${esc(p.penjaga||"—")}</td></tr>
       <tr><td>Kategori</td><td>${esc(p.kategori)}</td></tr>
       <tr><td>Yuran untuk</td><td>${bulanCantik(b.untukBulan)}</td></tr>
-      <tr><td>Tarikh bayaran</td><td>${b.tarikh}</td></tr>
+      <tr><td>Tarikh bayaran</td><td>${esc(formatTarikh(b.tarikh))}</td></tr>
       <tr><td>Kaedah</td><td>${esc(b.kaedah)}</td></tr>
       <tr><td>Rujukan</td><td>${esc(b.rujukan||"—")}</td></tr>
     </table>
@@ -1489,7 +1519,7 @@ Terima kasih atas pembayaran yuran mengaji.
 Pelajar: ${p.nama}
 Kategori: ${p.kategori}
 Yuran untuk: ${bulanCantik(b.untukBulan)}
-Tarikh bayar: ${b.tarikh}
+Tarikh bayar: ${formatTarikh(b.tarikh)}
 Kaedah: ${b.kaedah}
 Rujukan: ${b.rujukan||"-"}
 *Jumlah diterima: ${rm(b.jumlah)}*
