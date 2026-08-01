@@ -336,6 +336,7 @@ tbody tr:last-child td{border-bottom:0}
              onkeydown="if(event.key==='Enter')cubaLogin()">
       <button class="btn btn-utama btn-penuh" onclick="cubaLogin()">Log masuk</button>
       <div class="nota-login">
+        Kata laluan lalai ustazah: <b>aina2026</b><br>
         Pelajar: guna kata laluan yang ustazah berikan.<br>
         Adik-beradik yang berkongsi kata laluan akan masuk bersama.
       </div>
@@ -387,8 +388,10 @@ tbody tr:last-child td{border-bottom:0}
       <button class="btn btn-kecil buka-menu" onclick="togolSidebar()">☰</button>
       <h1 id="tajukHalaman">Papan Utama<small id="sariHalaman">Ringkasan kelas hari ini</small></h1>
       <div class="jam"><div class="masa" id="jamMasa">--:--:--</div><div class="tarikh" id="jamTarikh">—</div></div>
+      <button class="btn btn-kecil" id="btnSegerak" onclick="segerakSekarang()" title="Muat turun data terkini dari Google Sheet">⟳ Segerak</button>
       <button class="btn btn-kecil" id="btnMod" onclick="togolMod()" title="Tukar tema siang/malam">☾ Malam</button>
       <button class="btn btn-kecil" onclick="window.print()" title="Cetak halaman ini">⎙ Cetak</button>
+      <div class="pil" id="lencanaSegerak" style="background:var(--panel-2);color:var(--teks-3)">Tempatan</div>
       <div class="pil" id="lencanaPengguna" style="background:var(--panel-2);color:var(--teks-2)"></div>
     </div>
 
@@ -577,7 +580,16 @@ tbody tr:last-child td{border-bottom:0}
             <button class="btn btn-emas" onclick="tarikDariSheet()">↓ Muat turun dari Sheet</button>
             <button class="btn btn-hantu" onclick="tolakKeSheet(true)">↑ Hantar ke Sheet</button>
           </div>
-          <div class="hint" id="statusApi">Belum disambung — data disimpan dalam pelayar ini sahaja.</div>
+          <div class="hint" id="statusApi">Belum disambung — data disimpan dalam peranti ini sahaja.</div>
+          <div class="kad" style="margin:14px 0 0;background:var(--panel-2);box-shadow:none">
+            <b style="font-size:13px">Supaya semua peranti kongsi data yang sama</b>
+            <div style="font-size:13px;color:var(--teks-2);margin-top:6px;line-height:1.65">
+              Tetapan di atas hanya berkesan pada peranti ini. Untuk laptop, telefon dan tablet
+              guna Sheet yang sama secara automatik, isi <b>CONFIG</b> di baris pertama bahagian
+              <code>&lt;script&gt;</code> dalam fail <code>index.html</code>, kemudian muat naik semula ke GitHub:
+              <br><br><code style="font-size:12px">const CONFIG={URL_SHEET:"…/exec", KATA_KUNCI:"…"};</code>
+            </div>
+          </div>
         </div>
         <div class="kad">
           <h3>Kata laluan &amp; yuran lalai</h3>
@@ -619,6 +631,16 @@ tbody tr:last-child td{border-bottom:0}
 <div id="toast"></div>
 
 <script>
+/* =========================================================
+   0. TETAPAN SAMBUNGAN  —  ISI DUA BARIS INI SEKALI SAHAJA
+   Selepas diisi, SEMUA peranti (laptop, telefon, tablet) akan
+   guna Google Sheet yang sama secara automatik.
+   ========================================================= */
+const CONFIG={
+  URL_SHEET:"",     // contoh: "https://script.google.com/macros/s/AKfycb.../exec"
+  KATA_KUNCI:""     // mesti sama dengan KATA_KUNCI dalam Code.gs
+};
+
 /* =========================================================
    1. TETAPAN ASAS
    ========================================================= */
@@ -675,44 +697,77 @@ const adminKah=()=>SESI&&SESI.peranan==="admin";
 /* =========================================================
    3. SIMPAN & SEGERAK
    ========================================================= */
+let sudahTarik=false;   // pengadang: jangan hantar sebelum data Sheet ditarik
+
 function simpan(){
   try{localStorage.setItem(KUNCI,JSON.stringify(DB))}catch(e){}
   jadualTolak();
 }
 function muat(){
   try{const j=localStorage.getItem(KUNCI);if(j)DB=Object.assign(DB,JSON.parse(j))}catch(e){}
+  if(CONFIG.URL_SHEET){DB.tetapan.urlApi=CONFIG.URL_SHEET;DB.tetapan.tokenApi=CONFIG.KATA_KUNCI}
   if(!DB.pelajar.length)benihData();
+}
+function lencanaSegerak(teks,warna){
+  const e=el("lencanaSegerak");if(!e)return;
+  e.textContent=teks;e.style.background=warna+"22";e.style.color=warna;
 }
 let _tolak;
 function jadualTolak(){
   if(!DB.tetapan.urlApi)return;
+  if(!sudahTarik){lencanaSegerak("Belum segerak","#EA580C");return}
   clearTimeout(_tolak);_tolak=setTimeout(()=>tolakKeSheet(false),2500);
 }
 async function tolakKeSheet(lapor){
   if(!DB.tetapan.urlApi){if(lapor)toast("Sila isi URL Web App dahulu");return}
+  if(!sudahTarik&&!lapor)return;
+  lencanaSegerak("Menghantar…","#EA580C");
   try{
     const r=await fetch(DB.tetapan.urlApi,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
       body:JSON.stringify({tindakan:"tulis",kunci:DB.tetapan.tokenApi,data:{
         pelajar:DB.pelajar,kehadiran:DB.kehadiran,bayaran:DB.bayaran,komen:DB.komen,tetapan:DB.tetapan}})});
     const j=await r.json();
-    if(j.ok){el("statusApi").textContent="Disegerakkan ke Google Sheet pada "+new Date().toLocaleTimeString("ms-MY");
+    if(j.ok){sudahTarik=true;
+      const m=new Date().toLocaleTimeString("ms-MY");
+      el("statusApi").textContent="Disegerakkan ke Google Sheet pada "+m;
+      lencanaSegerak("Tersegerak "+m.slice(0,5),"#16A34A");
       if(lapor)toast("Data dihantar ke Google Sheet")}
     else throw new Error(j.ralat||"gagal");
-  }catch(e){el("statusApi").textContent="Gagal menghantar: "+e.message;if(lapor)toast("Gagal menghantar — semak URL & kata kunci")}
+  }catch(e){
+    el("statusApi").textContent="Gagal menghantar: "+e.message;
+    lencanaSegerak("Gagal hantar","#DC2626");
+    if(lapor)toast("Gagal menghantar — semak URL & kata kunci")}
 }
-async function tarikDariSheet(){
-  if(!DB.tetapan.urlApi){toast("Sila isi URL Web App dahulu");return}
-  if(!confirm("Muat turun akan menggantikan data dalam pelayar ini dengan data Google Sheet. Teruskan?"))return;
+async function tarikDariSheet(senyap){
+  if(!DB.tetapan.urlApi){if(!senyap)toast("Sila isi URL Web App dahulu");return false}
+  if(!senyap&&!confirm("Muat turun akan menggantikan data dalam peranti ini dengan data Google Sheet. Teruskan?"))return false;
+  lencanaSegerak("Memuat turun…","#0891B2");
   try{
     const r=await fetch(DB.tetapan.urlApi+"?tindakan=baca&kunci="+encodeURIComponent(DB.tetapan.tokenApi));
     const j=await r.json();
     if(!j.ok)throw new Error(j.ralat||"gagal");
     ["pelajar","kehadiran","bayaran","komen"].forEach(k=>{if(Array.isArray(j.data[k]))DB[k]=j.data[k]});
-    if(j.data.tetapan)DB.tetapan=Object.assign(DB.tetapan,j.data.tetapan);
+    if(j.data.tetapan)DB.tetapan=Object.assign(DB.tetapan,j.data.tetapan,
+      CONFIG.URL_SHEET?{urlApi:CONFIG.URL_SHEET,tokenApi:CONFIG.KATA_KUNCI}:{});
+    sudahTarik=true;
     try{localStorage.setItem(KUNCI,JSON.stringify(DB))}catch(e){}
-    lukisSemua();toast("Data dimuat turun dari Google Sheet");
-    el("statusApi").textContent="Dimuat turun pada "+new Date().toLocaleTimeString("ms-MY");
-  }catch(e){toast("Gagal memuat turun: "+e.message)}
+    const m=new Date().toLocaleTimeString("ms-MY");
+    el("statusApi").textContent="Dimuat turun pada "+m;
+    lencanaSegerak("Tersegerak "+m.slice(0,5),"#16A34A");
+    if(SESI)lukisSemua(); else if(peranPilih==="pelajar")pilihPeranan("pelajar");
+    if(!senyap)toast("Data dimuat turun dari Google Sheet");
+    return true;
+  }catch(e){
+    lencanaSegerak("Luar talian","#DC2626");
+    el("statusApi").textContent="Gagal memuat turun: "+e.message;
+    if(!senyap)toast("Gagal memuat turun: "+e.message);
+    return false;
+  }
+}
+async function segerakSekarang(){
+  if(!DB.tetapan.urlApi){toast("Sambungan Google Sheet belum ditetapkan");bukaHalaman("tetapan");return}
+  const ok=await tarikDariSheet(true);
+  toast(ok?"Data terkini dimuat turun":"Gagal menyambung — data tempatan dikekalkan");
 }
 
 function benihData(){
@@ -1642,6 +1697,10 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")tutupModal()});
   pilihPeranan("admin");
   const s=sessionStorage.getItem("sesi_aina");
   if(s){try{SESI=JSON.parse(s);if(SESI.peranan!=="pelajar"||pel(SESI.pelajarId))mulaApp();else SESI=null}catch(e){}}
+  if(DB.tetapan.urlApi)tarikDariSheet(true);
+  // segerak semula bila tab diaktifkan semula (contoh: tukar dari telefon ke laptop)
+  document.addEventListener("visibilitychange",()=>{
+    if(!document.hidden&&DB.tetapan.urlApi&&SESI)tarikDariSheet(true)});
 })();
 </script>
 </body>
