@@ -10,6 +10,10 @@
  *       Who has access: Anyone
  *  5. Salin URL /exec, tampal dalam laman > Data & Tetapan.
  *
+ * PENTING: Setiap kali kod ini diedit, kena buat "New version" semasa
+ * deploy (Deploy > Manage deployments > pensel > Version: New version
+ * > Deploy) — kalau tidak, URL /exec lama akan terus guna kod LAMA.
+ *
  * Helaian (tab) akan dicipta automatik: Pelajar, Kehadiran, Bayaran, Komen, Tetapan.
  * Anda boleh edit terus dalam Sheet, kemudian tekan "Muat turun dari Sheet" di laman.
  */
@@ -23,6 +27,15 @@ var SKEMA = {
   Komen:     ['id','pelajarId','tarikh','jenis','teks']
 };
 var NOMBOR = ['mukaSurat','tempoh','yuran','msDari','msHingga','jumlah'];
+
+// Lajur yang MESTI kekal sebagai teks — elak Google Sheets tukar
+// automatik kepada jenis sel Date/Time (punca "masa"/"tarikh" jadi
+// pelik macam 1899-12-30 atau ada GMT bila dibaca semula).
+var LAJUR_TEKS = {
+  Pelajar:   ['masa', 'mula'],
+  Kehadiran: ['tarikh'],
+  Bayaran:   ['tarikh']
+};
 
 function balas(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
@@ -46,6 +59,14 @@ function keTeks(v) {
   return v === null || v === undefined ? '' : String(v);
 }
 
+// Macam keTeks(), tapi untuk lajur waktu (contoh "masa") — kalau Sheets
+// dah terlanjur tukar sel tu jadi Date/Time, format sebagai HH:mm sahaja,
+// bukan tarikh penuh.
+function keTeksWaktu(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'HH:mm');
+  return v === null || v === undefined ? '' : String(v);
+}
+
 function bacaHelaian(nama) {
   var tajuk = SKEMA[nama];
   var sh = helaian(nama, tajuk);
@@ -62,6 +83,8 @@ function bacaHelaian(nama) {
                     .filter(function (x) { return !isNaN(x); });
         } else if (t === 'aktif') {
           o.aktif = !(keTeks(v).toLowerCase() === 'tidak' || v === false);
+        } else if (t === 'masa') {
+          o.masa = keTeksWaktu(v);
         } else if (NOMBOR.indexOf(t) >= 0) {
           o[t] = Number(v) || 0;
         } else {
@@ -84,6 +107,12 @@ function tulisHelaian(nama, senarai) {
       var v = o[t];
       return v === null || v === undefined ? '' : v;
     });
+  });
+  // paksa lajur waktu/tarikh sebagai TEKS dahulu, sebelum tulis nilai —
+  // supaya Sheets tak automatik tukar "16:00" jadi sel jenis Time.
+  (LAJUR_TEKS[nama] || []).forEach(function (medan) {
+    var idx = tajuk.indexOf(medan);
+    if (idx >= 0) sh.getRange(2, idx + 1, baris.length, 1).setNumberFormat('@');
   });
   sh.getRange(2, 1, baris.length, tajuk.length).setValues(baris);
 }
@@ -148,4 +177,3 @@ function doPost(e) {
     try { kunci.releaseLock(); } catch (x) {}
   }
 }
-
