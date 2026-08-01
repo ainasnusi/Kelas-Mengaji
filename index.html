@@ -336,7 +336,8 @@ tbody tr:last-child td{border-bottom:0}
              onkeydown="if(event.key==='Enter')cubaLogin()">
       <button class="btn btn-utama btn-penuh" onclick="cubaLogin()">Log masuk</button>
       <div class="nota-login">
-         Pelajar: guna kata laluan yang ustazah berikan.<br>
+        Kata laluan lalai ustazah: <b>aina2026</b><br>
+        Pelajar: guna kata laluan yang ustazah berikan.<br>
         Adik-beradik yang berkongsi kata laluan akan masuk bersama.
       </div>
     </div>
@@ -677,6 +678,14 @@ const el=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const idBaru=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const rm=n=>"RM "+(Number(n)||0).toFixed(2);
+function formatMasa(m){
+  if(!m)return"";
+  const s=String(m);
+  if(/^\d{1,2}:\d{2}$/.test(s))return s;
+  const c=s.match(/(\d{1,2}):(\d{2})/);
+  if(c)return c[1].padStart(2,"0")+":"+c[2];
+  return s;
+}
 const iso=d=>{const x=new Date(d);x.setMinutes(x.getMinutes()-x.getTimezoneOffset());return x.toISOString().slice(0,10)};
 const hariIni=()=>iso(new Date());
 const bulanIni=()=>hariIni().slice(0,7);
@@ -746,6 +755,7 @@ async function tarikDariSheet(senyap){
     const j=await r.json();
     if(!j.ok)throw new Error(j.ralat||"gagal");
     ["pelajar","kehadiran","bayaran","komen"].forEach(k=>{if(Array.isArray(j.data[k]))DB[k]=j.data[k]});
+    (DB.pelajar||[]).forEach(p=>{if(p.masa)p.masa=formatMasa(p.masa)});
     if(j.data.tetapan)DB.tetapan=Object.assign(DB.tetapan,j.data.tetapan,
       CONFIG.URL_SHEET?{urlApi:CONFIG.URL_SHEET,tokenApi:CONFIG.KATA_KUNCI}:{});
     sudahTarik=true;
@@ -938,12 +948,12 @@ function lukisDashboard(){
 
   el("tarikhHariIni").textContent=tarikhCantik(t);
   const hariNo=new Date(t+"T00:00:00").getDay();
-  const jadual=senarai.filter(p=>(p.hari||[]).includes(hariNo)).sort((a,b)=>(a.masa||"").localeCompare(b.masa||""));
+  const jadual=senarai.filter(p=>(p.hari||[]).includes(hariNo)).sort((a,b)=>formatMasa(a.masa).localeCompare(formatMasa(b.masa)));
   el("senaraiHariIni").innerHTML=jadual.length?jadual.map(p=>{
     const r=DB.kehadiran.find(k=>k.tarikh===t&&k.pelajarId===p.id);
     const s=r?STATUS[r.status]:null;
     return `<div style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--garis)">
-      <span class="num" style="font-weight:700;color:var(--aksen);min-width:52px">${esc(p.masa||"—")}</span>
+      <span class="num" style="font-weight:700;color:var(--aksen);min-width:52px">${esc(formatMasa(p.masa)||"—")}</span>
       <div style="flex:1"><b>${esc(p.nama)}</b>
         <div style="font-size:12px;color:var(--teks-3)">${esc(p.kategori)} · ${p.tempoh} minit</div></div>
       ${s?pil(s.label,s.hex):`<span class="pil" style="background:var(--panel-2);color:var(--teks-3)">Belum ditanda</span>`}
@@ -995,7 +1005,7 @@ function lukisPelajar(){
     return `<tr ondblclick="borangPelajar('${p.id}')">
       <td><b>${esc(p.nama)}</b><div style="font-size:11.5px;color:var(--teks-3)">m.s. ${p.mukaSurat||0}</div></td>
       <td>${pil(p.kategori,k.warna)}</td>
-      <td>${(p.hari||[]).map(h=>HARI[h].slice(0,3)).join(", ")||"—"}<div style="font-size:11.5px;color:var(--teks-3)" class="num">${esc(p.masa||"")}</div></td>
+      <td>${(p.hari||[]).map(h=>HARI[h].slice(0,3)).join(", ")||"—"}<div style="font-size:11.5px;color:var(--teks-3)" class="num">${esc(formatMasa(p.masa))}</div></td>
       <td class="num">${p.tempoh} min</td>
       <td>${esc(p.penjaga||"—")}<div style="font-size:11.5px;color:var(--teks-3)" class="num">${esc(p.tel||"")}</div>
         ${p.keluarga?`<span class="pil" style="background:var(--emas)22;color:var(--emas);margin-top:3px">◈ ${esc(p.keluarga)}</span>`:""}</td>
@@ -1022,7 +1032,7 @@ function borangPelajar(id){
     <div class="grid g2">
       <div><label class="lbl">Tempoh mengaji</label><select class="medan" id="fTempoh">
         ${TEMPOH.map(t=>`<option value="${t}" ${t==p.tempoh?"selected":""}>${t} minit</option>`).join("")}</select></div>
-      <div><label class="lbl">Waktu mula</label><input class="medan" id="fMasa" type="time" value="${esc(p.masa||"17:00")}"></div>
+      <div><label class="lbl">Waktu mula</label><input class="medan" id="fMasa" type="time" value="${esc(formatMasa(p.masa)||"17:00")}"></div>
     </div>
     <label class="lbl">Hari kelas</label>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
@@ -1109,7 +1119,7 @@ function lukisHarian(){
   const hariNo=new Date(t+"T00:00:00").getDay();
   const senarai=senaraiSaya().sort((a,b)=>{
     const ja=(a.hari||[]).includes(hariNo)?0:1,jb=(b.hari||[]).includes(hariNo)?0:1;
-    return ja-jb||(a.masa||"").localeCompare(b.masa||"")});
+    return ja-jb||formatMasa(a.masa).localeCompare(formatMasa(b.masa))});
   if(!senarai.length){el("jadualHarian").innerHTML=kosong("Tiada pelajar","");return}
   el("jadualHarian").innerHTML=`<div class="kad" style="padding:0;overflow:hidden">
     <div style="padding:13px 18px;background:var(--panel-2);border-bottom:1px solid var(--garis)">
@@ -1121,7 +1131,7 @@ function lukisHarian(){
       const r=rekodKehadiran(p.id,t),s=r?STATUS[r.status]:null;
       const berjadual=(p.hari||[]).includes(hariNo);
       return `<tr ondblclick="borangKehadiran('${p.id}','${t}')" style="${berjadual?"":"opacity:.62"}">
-        <td class="num"><b>${esc(p.masa||"—")}</b>${berjadual?"":'<div style="font-size:11px;color:var(--teks-3)">tiada jadual</div>'}</td>
+        <td class="num"><b>${esc(formatMasa(p.masa)||"—")}</b>${berjadual?"":'<div style="font-size:11px;color:var(--teks-3)">tiada jadual</div>'}</td>
         <td><b>${esc(p.nama)}</b><div style="font-size:11.5px;color:var(--teks-3)">${esc(p.kategori)}</div></td>
         <td>${s?pil(s.label,s.hex):'<span class="pil" style="background:var(--panel-2);color:var(--teks-3)">Belum ditanda</span>'}</td>
         <td class="num">${r?r.tempoh+" min":"—"}</td>
