@@ -662,17 +662,19 @@ const STATUS_GANTI={
  sudah:{label:"Sudah Diganti",kod:"SD",emoji:"🟢",hex:"#22C55E"},
  takperlu:{label:"Tidak Perlu Diganti",kod:"TP",emoji:"⚪",hex:"#94A3B8"}
 };
+function perluGanti(status){return status==="tidak"||status==="tiada"}
+function pilihanGanti(status){return status==="tiada"?["belum","sudah"]:["belum","sudah","takperlu"]}
 function badgeKehadiran(r){
   if(!r)return '<span class="pil" style="background:var(--panel-2);color:var(--teks-3)">Belum ditanda</span>';
   const s=STATUS_HADIR[r.status];if(!s)return"—";
   let h=pil(s.emoji+" "+s.label,s.hex);
-  if(r.status==="tidak"&&r.ganti&&STATUS_GANTI[r.ganti]){const g=STATUS_GANTI[r.ganti];h+=" "+pil(g.emoji+" "+g.label,g.hex)}
+  if(perluGanti(r.status)&&r.ganti&&STATUS_GANTI[r.ganti]){const g=STATUS_GANTI[r.ganti];h+=" "+pil(g.emoji+" "+g.label,g.hex)}
   return h;
 }
 function selKehadiran(r){
   if(!r)return null;
-  if(r.status==="tidak"){const g=STATUS_GANTI[r.ganti]||STATUS_GANTI.belum;
-    return {kod:"T",hex:g.hex,label:STATUS_HADIR.tidak.label+" · "+g.label}}
+  if(perluGanti(r.status)){const g=STATUS_GANTI[r.ganti]||STATUS_GANTI.belum;
+    return {kod:STATUS_HADIR[r.status].kod,hex:g.hex,label:STATUS_HADIR[r.status].label+" · "+g.label}}
   const s=STATUS_HADIR[r.status];
   return {kod:s.kod,hex:s.hex,label:s.label};
 }
@@ -765,7 +767,7 @@ function bersihkanDB(){
     if(k.tarikh)k.tarikh=formatTarikh(k.tarikh);
     if(k.status==="belum"){k.status="tidak";k.ganti="belum"}
     else if(k.status==="sudah"){k.status="tidak";k.ganti="sudah"}
-    else if(k.status==="tidak"&&!k.ganti){k.ganti="belum"}
+    else if(perluGanti(k.status)&&!k.ganti){k.ganti="belum"}
   });
   (DB.bayaran||[]).forEach(b=>{
     if(b.tarikh)b.tarikh=formatTarikh(b.tarikh);
@@ -1008,7 +1010,7 @@ function lukisDashboard(){
   const stat=[
     ["Pelajar aktif",senarai.length,"orang","var(--ungu-3)"],
     ["Hadir hari ini",kira("hadir"),"daripada "+rekodHariIni.length+" rekod","var(--hadir)"],
-    ["Belum ganti",DB.kehadiran.filter(k=>k.status==="tidak"&&k.ganti==="belum"&&senarai.some(p=>p.id===k.pelajarId)).length,"sesi tertunggak","var(--belum)"],
+    ["Belum ganti",DB.kehadiran.filter(k=>perluGanti(k.status)&&k.ganti==="belum"&&senarai.some(p=>p.id===k.pelajarId)).length,"sesi tertunggak","var(--belum)"],
     ["Kutipan "+bulanCantik(bl),rm(kutipan),"tunggakan "+rm(tunggak),"var(--emas)"]
   ];
   el("statDashboard").innerHTML=stat.map(s=>`<div class="stat" style="border-left-color:${s[3]}">
@@ -1029,7 +1031,7 @@ function lukisDashboard(){
 
   const perhatian=[];
   senarai.forEach(p=>{
-    const bg=DB.kehadiran.filter(k=>k.pelajarId===p.id&&k.status==="tidak"&&k.ganti==="belum").length;
+    const bg=DB.kehadiran.filter(k=>k.pelajarId===p.id&&perluGanti(k.status)&&k.ganti==="belum").length;
     if(bg)perhatian.push([p.nama,bg+" sesi belum diganti","var(--belum)"]);
     const tg=tunggakanPelajar(p);
     if(tg>0)perhatian.push([p.nama,"Tunggakan "+rm(tg),"var(--tunggak)"]);
@@ -1179,15 +1181,15 @@ function rekodKehadiran(pid,tarikh){return DB.kehadiran.find(k=>k.pelajarId===pi
 function setStatus(pid,tarikh,status){
   if(!adminKah())return;
   let r=rekodKehadiran(pid,tarikh);
-  if(!r){const p=pel(pid);r={id:idBaru(),pelajarId:pid,tarikh,status,ganti:status==="tidak"?"belum":"",tempoh:p.tempoh,
+  if(!r){const p=pel(pid);r={id:idBaru(),pelajarId:pid,tarikh,status,ganti:perluGanti(status)?"belum":"",tempoh:p.tempoh,
     msDari:p.mukaSurat||0,msHingga:p.mukaSurat||0,catatan:""};DB.kehadiran.push(r)}
-  else{r.status=status;if(status==="tidak"){if(!r.ganti)r.ganti="belum"}else r.ganti=""}
+  else{r.status=status;if(perluGanti(status)){if(!r.ganti||!pilihanGanti(status).includes(r.ganti))r.ganti="belum"}else r.ganti=""}
   simpan();lukisSemua();
 }
 function setGanti(pid,tarikh,ganti){
   if(!adminKah())return;
   const r=rekodKehadiran(pid,tarikh);
-  if(!r||r.status!=="tidak")return;
+  if(!r||!perluGanti(r.status))return;
   r.ganti=ganti;simpan();lukisSemua();
 }
 function anjakHari(n){el("tarikhHarian").value=tambahHari(el("tarikhHarian").value||hariIni(),n);lukisHarian()}
@@ -1224,25 +1226,33 @@ function lukisHarian(){
           Object.entries(STATUS_HADIR).map(([k,v])=>`<button class="btn btn-kecil" title="${v.label}"
             onclick="event.stopPropagation();setStatus('${p.id}','${t}','${k}')"
             style="background:${r&&r.status===k?v.hex:"var(--panel-2)"};color:${r&&r.status===k?"#fff":"var(--teks-3)"};padding:4px 8px;margin-right:3px;font-size:11px">${v.kod}</button>`).join("")}${
-          r&&r.status==="tidak"?`<span style="display:inline-block;width:1px;height:16px;background:var(--garis);margin:0 4px;vertical-align:middle"></span>`+
-          Object.entries(STATUS_GANTI).map(([k,v])=>`<button class="btn btn-kecil" title="${v.label}"
+          r&&perluGanti(r.status)?`<span style="display:inline-block;width:1px;height:16px;background:var(--garis);margin:0 4px;vertical-align:middle"></span>`+
+          pilihanGanti(r.status).map(k=>{const v=STATUS_GANTI[k];return `<button class="btn btn-kecil" title="${v.label}"
             onclick="event.stopPropagation();setGanti('${p.id}','${t}','${k}')"
-            style="background:${r.ganti===k?v.hex:"var(--panel-2)"};color:${r.ganti===k?"#fff":"var(--teks-3)"};padding:4px 8px;margin-right:3px;font-size:11px">${v.kod}</button>`).join(""):""}</td>`:''}
+            style="background:${r.ganti===k?v.hex:"var(--panel-2)"};color:${r.ganti===k?"#fff":"var(--teks-3)"};padding:4px 8px;margin-right:3px;font-size:11px">${v.kod}</button>`}).join(""):""}</td>`:''}
       </tr>`}).join("")+`</tbody></table></div></div>`;
+}
+function kemaskiniGantiWrap(){
+  const st=el("kStatus").value,wrap=el("kGantiWrap"),sel=el("kGanti");
+  if(perluGanti(st)){
+    wrap.style.display="block";
+    const semasa=sel.value;
+    sel.innerHTML=pilihanGanti(st).map(k=>`<option value="${k}" ${semasa===k?"selected":""}>${STATUS_GANTI[k].emoji} ${STATUS_GANTI[k].label}</option>`).join("");
+  }else wrap.style.display="none";
 }
 function borangKehadiran(pid,tarikh){
   if(!adminKah())return;
   const p=pel(pid);let r=rekodKehadiran(pid,tarikh);
   const baru=!r;
   if(baru)r={status:"hadir",ganti:"",tempoh:p.tempoh,msDari:p.mukaSurat||0,msHingga:p.mukaSurat||0,catatan:""};
+  const opsyenGanti=k=>`<option value="${k}" ${(r.ganti||"belum")===k?"selected":""}>${STATUS_GANTI[k].emoji} ${STATUS_GANTI[k].label}</option>`;
   modal(p.nama+" — "+tarikhCantik(tarikh),`
     <label class="lbl">Status kehadiran</label>
-    <select class="medan" id="kStatus" onchange="el('kGantiWrap').style.display=this.value==='tidak'?'block':'none'">${Object.entries(STATUS_HADIR).map(([k,v])=>
+    <select class="medan" id="kStatus" onchange="kemaskiniGantiWrap()">${Object.entries(STATUS_HADIR).map(([k,v])=>
       `<option value="${k}" ${r.status===k?"selected":""}>${v.emoji} ${v.label}</option>`).join("")}</select>
-    <div id="kGantiWrap" style="display:${r.status==="tidak"?"block":"none"};margin-bottom:14px">
+    <div id="kGantiWrap" style="display:${perluGanti(r.status)?"block":"none"};margin-bottom:14px">
       <label class="lbl">Status penggantian</label>
-      <select class="medan" id="kGanti">${Object.entries(STATUS_GANTI).map(([k,v])=>
-        `<option value="${k}" ${(r.ganti||"belum")===k?"selected":""}>${v.emoji} ${v.label}</option>`).join("")}</select>
+      <select class="medan" id="kGanti">${pilihanGanti(r.status).map(opsyenGanti).join("")}</select>
     </div>
     <div class="grid g2">
       <div><label class="lbl">Tempoh mengaji</label><select class="medan" id="kTempoh">
@@ -1260,7 +1270,7 @@ function borangKehadiran(pid,tarikh){
     {teks:"Batal",kelas:"btn-hantu",fungsi:tutupModal},
     {teks:"Simpan",kelas:"btn-utama",fungsi:()=>{
       const st=el("kStatus").value;
-      const d={status:st,ganti:st==="tidak"?el("kGanti").value:"",tempoh:+el("kTempoh").value,
+      const d={status:st,ganti:perluGanti(st)?el("kGanti").value:"",tempoh:+el("kTempoh").value,
         msDari:+el("kDari").value||0,msHingga:+el("kHingga").value||0,catatan:el("kCatatan").value.trim()};
       if(baru)DB.kehadiran.push(Object.assign({id:idBaru(),pelajarId:pid,tarikh},d));
       else Object.assign(r,d);
@@ -1288,7 +1298,7 @@ function lukisMingguan(){
     let minit=0,hadirKira=0;
     const sel=hari.map(h=>{
       const r=rekodKehadiran(p.id,h);
-      if(r&&(r.status==="hadir"||(r.status==="tidak"&&r.ganti==="sudah"))){minit+=+r.tempoh||0;hadirKira++}
+      if(r&&(r.status==="hadir"||(perluGanti(r.status)&&r.ganti==="sudah"))){minit+=+r.tempoh||0;hadirKira++}
       const c=r?selKehadiran(r):null;
       return `<td class="sel" ondblclick="borangKehadiran('${p.id}','${h}')" title="${c?c.label:"Belum ditanda"} — dwiklik untuk isi">
         <div class="kotak-sel ${c?"":"kosong-sel"}" style="${c?`background:${c.hex}`:""}">${c?c.kod:"·"}</div></td>`}).join("");
@@ -1299,7 +1309,7 @@ function lukisMingguan(){
 
   const semua=DB.kehadiran.filter(k=>hari.includes(k.tarikh)&&senarai.some(p=>p.id===k.pelajarId));
   const kiraH=s=>semua.filter(k=>k.status===s).length;
-  const jumMinit=semua.filter(k=>k.status==="hadir"||(k.status==="tidak"&&k.ganti==="sudah")).reduce((a,k)=>a+(+k.tempoh||0),0);
+  const jumMinit=semua.filter(k=>k.status==="hadir"||(perluGanti(k.status)&&k.ganti==="sudah")).reduce((a,k)=>a+(+k.tempoh||0),0);
   el("ringkasMingguan").innerHTML=`<div class="grid g4" style="margin-top:18px">
     ${Object.entries(STATUS_HADIR).map(([k,v])=>`<div class="stat" style="border-left-color:${v.hex}">
       <div class="nilai" style="color:${v.hex}">${kiraH(k)}</div><div class="label">${v.emoji} ${v.label}</div></div>`).join("")}
@@ -1316,7 +1326,7 @@ function lukisBacaan(){
   el("kadBacaan").innerHTML=senarai.length?senarai.map(p=>{
     const k=kat(p.kategori),pk=Math.min(100,Math.round((p.mukaSurat||0)/k.maks*100));
     const sesi=DB.kehadiran.filter(x=>x.pelajarId===p.id&&x.msHingga).sort((a,b)=>b.tarikh.localeCompare(a.tarikh)).slice(0,6);
-    const jumMinit=DB.kehadiran.filter(x=>x.pelajarId===p.id&&(x.status==="hadir"||(x.status==="tidak"&&x.ganti==="sudah")))
+    const jumMinit=DB.kehadiran.filter(x=>x.pelajarId===p.id&&(x.status==="hadir"||(perluGanti(x.status)&&x.ganti==="sudah")))
       .reduce((a,x)=>a+(+x.tempoh||0),0);
     return `<div class="kad" style="border-top:4px solid ${k.warna}" ${adminKah()?`ondblclick="borangBacaan('${p.id}')"`:""}>
       <div style="display:flex;align-items:flex-start;gap:10px">
@@ -1725,8 +1735,8 @@ function lukisPantauBatal(){
     <th>Had masa ganti</th></tr></thead><tbody>`+
   senarai.map(p=>{
     const bt=batalBulanIni(p.id);
-    const bg=DB.kehadiran.filter(k=>k.pelajarId===p.id&&k.status==="tidak"&&k.ganti==="belum").length;
-    const sg=DB.kehadiran.filter(k=>k.pelajarId===p.id&&k.status==="tidak"&&k.ganti==="sudah").length;
+    const bg=DB.kehadiran.filter(k=>k.pelajarId===p.id&&perluGanti(k.status)&&k.ganti==="belum").length;
+    const sg=DB.kehadiran.filter(k=>k.pelajarId===p.id&&perluGanti(k.status)&&k.ganti==="sudah").length;
     const tp=DB.kehadiran.filter(k=>k.pelajarId===p.id&&k.status==="tidak"&&k.ganti==="takperlu").length;
     const had=bt>3?["Maksimum 30 minit","#DC2626"]:["Penuh "+p.tempoh+" minit","#16A34A"];
     return `<tr><td><b>${esc(p.nama)}</b></td>
