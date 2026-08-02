@@ -1342,7 +1342,7 @@ function lukisKomen(){
 function bulanTerlibat(p){
   const mula=p.mula||bulanIni(),kini=bulanIni();
   const [ya,ma]=mula.split("-").map(Number),[yb,mb]=kini.split("-").map(Number);
-  return Math.max(1,(yb-ya)*12+(mb-ma)+1);
+  return Math.max(0,(yb-ya)*12+(mb-ma));   // bulan semasa tak dikira tertunggak lagi — hanya bulan yang dah tamat
 }
 function jumlahDibayar(pid,bulan){
   return DB.bayaran.filter(b=>b.pelajarId===pid&&(!bulan||b.untukBulan===bulan))
