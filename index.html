@@ -100,11 +100,12 @@ a{color:var(--aksen)}
 label.lbl{display:block;font-size:12px;font-weight:700;letter-spacing:.06em;
   text-transform:uppercase;color:var(--teks-3);margin:0 0 6px}
 .medan{
-  width:100%;padding:11px 13px;border:1.5px solid var(--garis);border-radius:10px;
+  width:100%;min-width:0;max-width:100%;padding:11px 13px;border:1.5px solid var(--garis);border-radius:10px;
   background:var(--input-bg);outline:none;transition:.15s;margin-bottom:14px
 }
 .medan:focus{border-color:var(--aksen);box-shadow:0 0 0 3px rgba(109,40,217,.15)}
 select.medan{cursor:pointer}
+input[type="date"].medan,input[type="month"].medan{-webkit-appearance:none;appearance:none}
 textarea.medan{resize:vertical;min-height:80px;line-height:1.5}
 
 .btn{
@@ -124,6 +125,8 @@ textarea.medan{resize:vertical;min-height:80px;line-height:1.5}
 
 .amaran{background:rgba(220,38,38,.12);color:var(--tidak);border-radius:8px;
   padding:9px 12px;font-size:13px;font-weight:600;margin-bottom:12px;display:none}
+.notis{background:rgba(217,169,74,.14);border:1px solid rgba(217,169,74,.35);color:var(--emas-lembut);
+  border-radius:10px;padding:11px 14px;font-size:13px;font-weight:600;margin-bottom:18px;line-height:1.5}
 .nota-login{margin-top:16px;padding-top:14px;border-top:1px solid var(--garis);
   font-size:12px;color:var(--teks-3);text-align:center;line-height:1.6}
 
@@ -192,7 +195,7 @@ textarea.medan{resize:vertical;min-height:80px;line-height:1.5}
 .kad .sari{font-size:13px;color:var(--teks-3);margin-bottom:14px}
 .baris{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
 .baris .medan{margin-bottom:0}
-.medan-kump{display:flex;flex-direction:column;gap:0}
+.medan-kump{display:flex;flex-direction:column;gap:0;min-width:0;overflow:hidden}
 .grid{display:grid;gap:14px}
 .g2{grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr))}
 .g3{grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr))}
@@ -234,11 +237,11 @@ tbody tr:last-child td{border-bottom:0}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--ungu-3),var(--emas));border-radius:99px}
 
 /* Peraturan */
-.peraturan{counter-reset:pr;display:grid;gap:11px}
-.peraturan li{list-style:none;display:flex;gap:13px;background:var(--panel-2);
-  border-left:3px solid var(--emas);border-radius:var(--r-kecil);padding:13px 15px}
-.peraturan li::before{counter-increment:pr;content:counter(pr);font-family:var(--serif);
-  font-size:19px;font-weight:700;color:var(--emas);flex:0 0 24px;line-height:1.2}
+.peraturan{counter-reset:pr;display:grid;gap:8px}
+.peraturan li{list-style:none;background:var(--panel-2);
+  border-left:3px solid var(--emas);border-radius:var(--r-kecil);padding:11px 14px;line-height:1.55}
+.peraturan li::before{counter-increment:pr;content:counter(pr)". ";font-family:var(--serif);
+  font-size:16px;font-weight:700;color:var(--emas)}
 
 /* Modal */
 .tirai{position:fixed;inset:0;background:rgba(20,6,40,.7);backdrop-filter:blur(3px);
@@ -281,6 +284,10 @@ tbody tr:last-child td{border-bottom:0}
   .buka-menu{display:inline-flex}
   .kandungan,.topbar{padding-left:16px;padding-right:16px}
   .topbar h1{font-size:17px}
+  .baris{align-items:stretch}
+  .baris>.medan-kump{flex:1 1 100%}
+  .baris>.medan-kump .medan{width:100%}
+  .baris>.btn{flex:1 1 auto}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
@@ -358,6 +365,7 @@ tbody tr:last-child td{border-bottom:0}
     <div class="nav-tajuk">Utama</div>
     <button class="nav-btn aktif" data-hal="dashboard" onclick="bukaHalaman('dashboard')"><span class="ikon">◆</span> Papan Utama</button>
     <button class="nav-btn" data-hal="pelajar" onclick="bukaHalaman('pelajar')"><span class="ikon">☺</span> Senarai Pelajar</button>
+    <button class="nav-btn" data-hal="peringatan" onclick="bukaHalaman('peringatan')"><span class="ikon">🔔</span> Peringatan Kelas</button>
 
     <div class="nav-tajuk">Kehadiran</div>
     <button class="nav-btn" data-hal="harian" onclick="bukaHalaman('harian')"><span class="ikon">☀</span> Kehadiran Harian</button>
@@ -442,6 +450,11 @@ tbody tr:last-child td{border-bottom:0}
         <div class="hint tanpa-cetak">✎ Dwiklik pada baris untuk edit atau hapus pelajar.</div>
       </section>
 
+      <!-- ===== PERINGATAN KELAS ===== -->
+      <section class="halaman" id="hal-peringatan">
+        <div id="senaraiPeringatan"></div>
+      </section>
+
       <!-- ===== KEHADIRAN HARIAN ===== -->
       <section class="halaman" id="hal-harian">
         <div class="kad tanpa-cetak">
@@ -515,6 +528,7 @@ tbody tr:last-child td{border-bottom:0}
 
       <!-- ===== YURAN ===== -->
       <section class="halaman" id="hal-yuran">
+        <div class="notis">🔔 Pembayaran perlu dilakukan dalam <b>tempoh minggu pertama setiap bulan</b></div>
         <div class="kad tanpa-cetak">
           <div class="baris" style="margin-bottom:0">
             <div class="medan-kump">
@@ -557,10 +571,14 @@ tbody tr:last-child td{border-bottom:0}
           <h3>Peraturan Kelas Mengaji</h3>
           <div class="sari">Sila patuhi bagi kelancaran kelas semua pelajar</div>
           <ol class="peraturan">
-            <li>Pelajar boleh hadir <b>10 minit awal</b> daripada waktu yang ditetapkan.</li>
-            <li>Jika ingin membatalkan kelas, perlu dimaklumkan <b>2 jam lebih awal</b>.</li>
-            <li>Jika pelajar membatalkan kelas <b>lebih daripada 3 kali</b> dalam sebulan, waktu maksimum yang akan diganti hanyalah <b>30 minit sahaja</b>.</li>
-            <li>Sila pastikan murid <b>membawa Al-Quran / Iqra'</b> masing-masing.</li>
+            <li>Pelajar boleh hadir <b>10 minit awal</b> daripada waktu yang ditetapkan</li>
+            <li>Jika ingin membatalkan kelas, perlu dimaklumkan <b>2 jam lebih awal</b></li>
+            <li>Jika pelajar membatalkan kelas <b>lebih daripada 3 kali</b> dalam sebulan, waktu maksimum yang akan diganti hanyalah <b>30 minit sahaja</b></li>
+            <li>Sila pastikan murid <b>membawa Al-Quran / Iqra'</b> masing-masing</li>
+            <li>Kelas akan diadakan di <b>238, BM4</b></li>
+            <li>Peringatan kelas akan dihantar <b>2 jam sebelum</b> kelas</li>
+            <li>Jika pihak guru membatalkan kelas, <b>setiap kelas akan diganti secara penuh</b></li>
+            <li>Sebarang persoalan/masalah, sila maklumkan pada <b>Ustazah Aina</b></li>
           </ol>
         </div>
       </section>
@@ -910,7 +928,7 @@ function mulaApp(){
 }
 function terapkanPeranan(){
   const admin=adminKah();
-  const sekat=["pelajar","tetapan"];
+  const sekat=["pelajar","peringatan","tetapan"];
   document.querySelectorAll(".nav-btn").forEach(b=>{
     b.style.display=(!admin&&sekat.includes(b.dataset.hal))?"none":"flex"});
   ['[onclick*="borangPelajar"]','[onclick*="borangBayaran"]','[onclick*="borangResitGabungan"]',
@@ -924,13 +942,14 @@ function terapkanPeranan(){
    ========================================================= */
 const TAJUK={dashboard:["Papan Utama","Ringkasan kelas hari ini"],
  pelajar:["Senarai Pelajar","Tambah, edit dan hapus rekod pelajar"],
+ peringatan:["Peringatan Kelas","Hantar peringatan waktu kelas ke WhatsApp penjaga"],
  harian:["Kehadiran Harian","Tanda kehadiran dan tempoh mengaji"],
  mingguan:["Kehadiran Mingguan","Paparan tujuh hari bagi semua pelajar"],
  bacaan:["Kemajuan Bacaan","Muka surat terkini mengikut Iqra' dan Al-Quran"],
  komen:["Catatan & Komen","Rekod komen ustazah bagi setiap pelajar"],
  yuran:["Yuran & Tunggakan","Semakan bayaran bulanan"],
  bayaran:["Rekod Pembayaran","Semua transaksi online dan tunai"],
- peraturan:["Peraturan Kelas","Empat peraturan wajib dipatuhi"],
+ peraturan:["Peraturan Kelas","Wajib dipatuhi bagi kelancaran kelas"],
  tetapan:["Data & Tetapan","Sambungan Google Sheet dan sandaran"]};
 function bukaHalaman(h){
   halSemasa=h;
@@ -963,7 +982,7 @@ function jamHidup(){
 function lukisSemua(){
   isiPilihanKategori();isiPilihanPelajar();lukisPetunjuk();
   lukisDashboard();lukisPelajar();lukisHarian();lukisMingguan();
-  lukisBacaan();lukisKomen();lukisYuran();lukisBayaran();lukisPantauBatal();isiTetapan();
+  lukisBacaan();lukisKomen();lukisYuran();lukisBayaran();lukisPantauBatal();lukisPeringatan();isiTetapan();
 }
 function isiPilihanKategori(){
   const s=el("tapisKategori");if(s.options.length>1)return;
@@ -1239,6 +1258,48 @@ function kemaskiniGantiWrap(){
     const semasa=sel.value;
     sel.innerHTML=pilihanGanti(st).map(k=>`<option value="${k}" ${semasa===k?"selected":""}>${STATUS_GANTI[k].emoji} ${STATUS_GANTI[k].label}</option>`).join("");
   }else wrap.style.display="none";
+}
+function waktuMalay(masa){
+  const m=formatMasa(masa);if(!m)return"—";
+  const [h,mi]=m.split(":").map(Number);
+  let h12=h%12;if(h12===0)h12=12;
+  const mm=String(mi).padStart(2,"0");
+  const tempoh=h<12?"pagi":h<15?"tengah hari":h<19?"petang":"malam";
+  return `${h12}.${mm} ${tempoh}`;
+}
+function mesejPeringatan(p){
+  return `*Peringatan Kelas Mengaji* 🌹
+
+Hari Ini
+Tempoh : ${p.tempoh} minit seorang
+Pukul : ${waktuMalay(p.masa)}`;
+}
+function hantarPeringatan(id){
+  const p=pel(id);
+  if(!p.tel){toast("Nombor WhatsApp penjaga belum diisi dalam rekod pelajar");return}
+  modal("Peringatan kelas — "+p.nama,`
+    <label class="lbl">Mesej (boleh diedit sebelum hantar)</label>
+    <textarea class="medan" id="pMesej" style="min-height:160px">${esc(mesejPeringatan(p))}</textarea>
+  `,[
+    {teks:"Batal",kelas:"btn-hantu",fungsi:tutupModal},
+    {teks:"💬 Hantar ke WhatsApp",kelas:"btn-utama",fungsi:()=>{
+      window.open("https://wa.me/"+p.tel+"?text="+encodeURIComponent(el("pMesej").value),"_blank");
+      tutupModal();
+    }}
+  ]);
+}
+function lukisPeringatan(){
+  const t=hariIni(),hariNo=new Date(t+"T00:00:00").getDay();
+  const senarai=senaraiSaya().filter(p=>(p.hari||[]).includes(hariNo))
+    .sort((a,b)=>formatMasa(a.masa).localeCompare(formatMasa(b.masa)));
+  el("senaraiPeringatan").innerHTML=senarai.length?senarai.map(p=>`
+    <div class="kad" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px">
+      <div style="flex:1;min-width:180px">
+        <h3 style="margin-bottom:2px">${esc(p.nama)}</h3>
+        <div class="sari" style="margin-bottom:0">${esc(p.penjaga||"—")} · <span class="num">${esc(formatMasa(p.masa)||"—")}</span> (${waktuMalay(p.masa)}) · ${p.tempoh} minit seorang</div>
+      </div>
+      ${adminKah()?`<button class="btn btn-utama" onclick="hantarPeringatan('${p.id}')">💬 Hantar Peringatan</button>`:""}
+    </div>`).join(""):kosong("Tiada kelas hari ini","Tiada peringatan perlu dihantar buat masa ini.");
 }
 function borangKehadiran(pid,tarikh){
   if(!adminKah())return;
