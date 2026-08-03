@@ -1267,39 +1267,52 @@ function waktuMalay(masa){
   const tempoh=h<12?"pagi":h<15?"tengah hari":h<19?"petang":"malam";
   return `${h12}.${mm} ${tempoh}`;
 }
-function mesejPeringatan(p){
+function mesejPeringatanKeluarga(ahli){
+  const awal=ahli[0];
   return `*Peringatan Kelas Mengaji* 🌹
-
 Hari Ini
-Tempoh : ${p.tempoh} minit seorang
-Pukul : ${waktuMalay(p.masa)}`;
+Tempoh : ${awal.tempoh} minit seorang
+Pukul : ${waktuMalay(awal.masa)}`;
 }
-function hantarPeringatan(id){
-  const p=pel(id);
-  if(!p.tel){toast("Nombor WhatsApp penjaga belum diisi dalam rekod pelajar");return}
-  modal("Peringatan kelas — "+p.nama,`
+function hantarPeringatanKeluarga(ids){
+  const ahli=ids.split(",").map(pel);
+  const kontak=ahli.find(p=>p.tel)||ahli[0];
+  if(!kontak.tel){toast("Nombor WhatsApp penjaga belum diisi dalam rekod pelajar");return}
+  const namaPenjaga=(ahli.find(p=>p.penjaga)||{}).penjaga||ahli.map(p=>p.nama).join(", ");
+  modal("Peringatan kelas — "+namaPenjaga,`
     <label class="lbl">Mesej (boleh diedit sebelum hantar)</label>
-    <textarea class="medan" id="pMesej" style="min-height:160px">${esc(mesejPeringatan(p))}</textarea>
+    <textarea class="medan" id="pMesej" style="min-height:160px">${esc(mesejPeringatanKeluarga(ahli))}</textarea>
   `,[
     {teks:"Batal",kelas:"btn-hantu",fungsi:tutupModal},
     {teks:"💬 Hantar ke WhatsApp",kelas:"btn-utama",fungsi:()=>{
-      window.open("https://wa.me/"+p.tel+"?text="+encodeURIComponent(el("pMesej").value),"_blank");
+      window.open("https://wa.me/"+kontak.tel+"?text="+encodeURIComponent(el("pMesej").value),"_blank");
       tutupModal();
     }}
   ]);
 }
 function lukisPeringatan(){
   const t=hariIni(),hariNo=new Date(t+"T00:00:00").getDay();
-  const senarai=senaraiSaya().filter(p=>(p.hari||[]).includes(hariNo))
-    .sort((a,b)=>formatMasa(a.masa).localeCompare(formatMasa(b.masa)));
-  el("senaraiPeringatan").innerHTML=senarai.length?senarai.map(p=>`
-    <div class="kad" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px">
+  const senarai=senaraiSaya().filter(p=>(p.hari||[]).includes(hariNo));
+  const kumpulan={};
+  senarai.forEach(p=>{
+    const kunci=keluargaPelajar(p)||("solo:"+p.id);
+    (kumpulan[kunci]=kumpulan[kunci]||[]).push(p);
+  });
+  const kumpulanTersusun=Object.values(kumpulan)
+    .map(ahli=>ahli.sort((a,b)=>formatMasa(a.masa).localeCompare(formatMasa(b.masa))))
+    .sort((a,b)=>formatMasa(a[0].masa).localeCompare(formatMasa(b[0].masa)));
+  el("senaraiPeringatan").innerHTML=kumpulanTersusun.length?kumpulanTersusun.map(ahli=>{
+    const awal=ahli[0];
+    const namaPenjaga=(ahli.find(p=>p.penjaga)||{}).penjaga||"—";
+    const namaMurid=ahli.map(p=>p.nama).join(", ");
+    return `<div class="kad" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px">
       <div style="flex:1;min-width:180px">
-        <h3 style="margin-bottom:2px">${esc(p.nama)}</h3>
-        <div class="sari" style="margin-bottom:0">${esc(p.penjaga||"—")} · <span class="num">${esc(formatMasa(p.masa)||"—")}</span> (${waktuMalay(p.masa)}) · ${p.tempoh} minit seorang</div>
+        <h3 style="margin-bottom:2px">${esc(namaPenjaga)}</h3>
+        <div class="sari" style="margin-bottom:0">${esc(namaMurid)} · <span class="num">${esc(formatMasa(awal.masa)||"—")}</span> (${waktuMalay(awal.masa)})</div>
       </div>
-      ${adminKah()?`<button class="btn btn-utama" onclick="hantarPeringatan('${p.id}')">💬 Hantar Peringatan</button>`:""}
-    </div>`).join(""):kosong("Tiada kelas hari ini","Tiada peringatan perlu dihantar buat masa ini.");
+      ${adminKah()?`<button class="btn btn-utama" onclick="hantarPeringatanKeluarga('${ahli.map(p=>p.id).join(",")}')">💬 Hantar Peringatan</button>`:""}
+    </div>`;
+  }).join(""):kosong("Tiada kelas hari ini","Tiada peringatan perlu dihantar buat masa ini.");
 }
 function borangKehadiran(pid,tarikh){
   if(!adminKah())return;
