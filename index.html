@@ -107,6 +107,12 @@ label.lbl{display:block;font-size:12px;font-weight:700;letter-spacing:.06em;
 select.medan{cursor:pointer}
 input[type="date"].medan,input[type="month"].medan{-webkit-appearance:none;appearance:none}
 textarea.medan{resize:vertical;min-height:80px;line-height:1.5}
+.kotak-kl{position:relative;margin-bottom:14px}
+.kotak-kl .medan{margin-bottom:0;padding-right:48px}
+.btn-mata{position:absolute;top:50%;right:7px;transform:translateY(-50%);
+  border:0;background:transparent;cursor:pointer;padding:6px 8px;border-radius:8px;
+  font-size:16px;line-height:1;opacity:.7;transition:.15s}
+.btn-mata:hover{opacity:1;background:var(--panel-2)}
 
 .btn{
   border:0;border-radius:10px;padding:10px 16px;font-weight:600;cursor:pointer;
@@ -339,8 +345,12 @@ tbody tr:last-child td{border-bottom:0}
         <select class="medan" id="pilihPelajar"></select>
       </div>
       <label class="lbl" for="kataLaluan">Kata laluan</label>
-      <input class="medan" id="kataLaluan" type="password" placeholder="Masukkan kata laluan"
-             onkeydown="if(event.key==='Enter')cubaLogin()">
+      <div class="kotak-kl">
+        <input class="medan" id="kataLaluan" type="password" placeholder="Masukkan kata laluan"
+               onkeydown="if(event.key==='Enter')cubaLogin()">
+        <button type="button" class="btn-mata" id="btnMata" onclick="togolKataLaluan()"
+                title="Tunjuk kata laluan" aria-label="Tunjuk kata laluan">👁️</button>
+      </div>
       <button class="btn btn-utama btn-penuh" onclick="cubaLogin()">Log masuk</button>
       <div class="nota-login">
         Pelajar: guna kata laluan yang ustazah berikan.<br>
@@ -674,7 +684,7 @@ const STATUS_HADIR={
  hadir:{label:"Hadir",kod:"H",emoji:"✅",hex:"#16A34A"},
  tidak:{label:"Tidak Hadir",kod:"T",emoji:"❌",hex:"#DC2626"},
  tiada:{label:"Kelas Ditangguhkan",kod:"D",emoji:"⏸️",hex:"#78716C"},
- tiadakelas:{label:"Tiada Kelas",kod:"TK",emoji:"📅",hex:"#64748B"}
+ nokelas:{label:"Tiada Kelas",kod:"TK",emoji:"🚫",hex:"#475569"}
 };
 const STATUS_GANTI={
  belum:{label:"Belum Diganti",kod:"BD",emoji:"🟡",hex:"#EAB308"},
@@ -884,12 +894,26 @@ function benihData(){
 /* =========================================================
    4. LOG MASUK
    ========================================================= */
+function togolKataLaluan(){
+  const i=el("kataLaluan"),b=el("btnMata");if(!i||!b)return;
+  const tunjuk=i.type==="password";
+  i.type=tunjuk?"text":"password";
+  b.textContent=tunjuk?"🙈":"👁️";
+  b.title=tunjuk?"Sembunyi kata laluan":"Tunjuk kata laluan";
+  b.setAttribute("aria-label",b.title);
+  i.focus();
+}
+function tutupMata(){
+  const i=el("kataLaluan"),b=el("btnMata");if(!i||!b)return;
+  i.type="password";b.textContent="👁️";
+  b.title="Tunjuk kata laluan";b.setAttribute("aria-label",b.title);
+}
 function pilihPeranan(p){
   peranPilih=p;
   el("tabAdmin").classList.toggle("aktif",p==="admin");
   el("tabPelajar").classList.toggle("aktif",p==="pelajar");
   el("medanPelajar").style.display=p==="pelajar"?"block":"none";
-  el("amaranLogin").style.display="none";el("kataLaluan").value="";
+  el("amaranLogin").style.display="none";el("kataLaluan").value="";tutupMata();
   if(p==="pelajar"){
     el("pilihPelajar").innerHTML=DB.pelajar.filter(x=>x.aktif!==false)
       .map(x=>`<option value="${x.id}">${esc(x.nama)}</option>`).join("")||`<option value="">Tiada pelajar</option>`;
@@ -919,7 +943,7 @@ function logKeluar(){
   if(!confirm("Log keluar sekarang?"))return;
   SESI=null;sessionStorage.removeItem("sesi_aina");
   el("skrinApp").style.display="none";el("skrinLogin").style.display="grid";
-  el("kataLaluan").value="";
+  el("kataLaluan").value="";tutupMata();
 }
 function mulaApp(){
   sessionStorage.setItem("sesi_aina",JSON.stringify(SESI));
@@ -1271,6 +1295,7 @@ function waktuMalay(masa){
 function mesejPeringatanKeluarga(ahli){
   const awal=ahli[0];
   return `*Peringatan Kelas Mengaji* 🌹
+
 Hari Ini
 Tempoh : ${awal.tempoh} minit seorang
 Pukul : ${waktuMalay(awal.masa)}`;
